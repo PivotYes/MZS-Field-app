@@ -1,9 +1,9 @@
 # MZS Field App
 
-Tenants report problems, workers handle jobs. Everything saves to Airtable.
+Tenants report problems, workers handle jobs, the office answers tenant messages. Everything saves to Airtable.
 
 ## Files
-- `index.html`: the app (tenant + worker screens, EN/ES)
+- `index.html`: the app (tenant, worker, and office screens, EN/ES)
 - `server.js`: serves the app and talks to Airtable (no outside packages)
 - `package.json`: tells Render how to start it
 
@@ -14,10 +14,19 @@ Tenants report problems, workers handle jobs. Everything saves to Airtable.
   - `AIRTABLE_TOKEN`: Airtable personal access token (scopes: data.records:read, data.records:write, schema.bases:read)
   - `AIRTABLE_BASE_ID`: starts with `app`
   - `WORKER_PIN`: code workers type to open the Worker side
+  - `OFFICE_PIN`: code the office types to open the Office side (tenant messages). Use a different code from `WORKER_PIN`.
   - `ANTHROPIC_API_KEY` (optional): turns on the office write-up button
 
 ## Airtable
-Tables `Requests` and `Feedback`. Field names must match exactly; see `REQ_FIELDS` and `FB_FIELDS` in server.js.
+Tables `Requests`, `Feedback`, and `Messages`. Field names must match exactly; see `REQ_FIELDS`, `FB_FIELDS`, and `MSG_FIELDS` in server.js.
+
+`Messages` table (tenant <-> office chat):
+- `Request`: link to `Requests`
+- `From`: single select with options `Tenant`, `Office`
+- `Message`: long text
+- `Created at`: created time
+
+Tenants can message on open and reopened requests, not finished ones. Workers never see messages.
 Workers can open the app's Worker side to see a warning if any field is missing.
 
 ## Editing with Claude Code

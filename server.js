@@ -3,6 +3,7 @@
 //   AIRTABLE_TOKEN     (required) Airtable personal access token
 //   AIRTABLE_BASE_ID   (required) starts with "app"
 //   WORKER_PIN         (required) code workers type to open the Worker side
+//   OFFICE_PIN         (required for tenant messages) code the office types to open the Office side
 //   ANTHROPIC_API_KEY  (optional) turns on the "Write it up for the office" button
 //   ANTHROPIC_MODEL    (optional) defaults to claude-haiku-5-5
 "use strict";
@@ -15,11 +16,13 @@ const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.AIRTABLE_TOKEN || "";
 const BASE = process.env.AIRTABLE_BASE_ID || "";
 const PIN = process.env.WORKER_PIN || "";
+const OFFICE_PIN = process.env.OFFICE_PIN || "";
 const AI_KEY = process.env.ANTHROPIC_API_KEY || "";
 const AI_MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
 
 const REQ_TABLE = "Requests";
 const FB_TABLE = "Feedback";
+const MSG_TABLE = "Messages";
 
 /* ---------- value maps: app code <-> Airtable option ---------- */
 const STATUS = { received: "Received", scheduled: "Scheduled", in_progress: "In progress", blocked: "On hold", done: "Done" };
@@ -28,10 +31,12 @@ const TIME = { morning: "Morning", afternoon: "Afternoon", anytime: "Anytime" };
 const BLOCK = { noAccess: "No access", needParts: "Need parts", needTrade: "Need another trade", notHome: "Tenant not home", anotherDay: "Need another day" };
 const LANG = { en: "English", es: "Spanish" };
 const SCREEN = { general: "General / whole app", tenantForm: "Tenant: Report a problem", tenantMine: "Tenant: My requests", workerJobs: "Worker: Job list", workerJob: "Worker: A job", airtable: "Airtable fields" };
+const FROM = { tenant: "Tenant", office: "Office" };
 const KIND = { bug: "Something's broken", change: "Change this", idea: "New idea", missing: "Something's missing" };
 
 const REQ_FIELDS = ["Ticket #","Status","Urgent","Problem type","Building address","Apartment","Tenant name","Tenant phone","Tenant description","Best time","Tenant photos","Visit date","Visit time","Started at","Finished at","Before photos","After photos","Worker notes","Office write-up","On-hold reason","Reopened","Flagged by worker","Tenant language","Created at","Last updated"];
 const FB_FIELDS = ["Feedback","Screen","Type","Handled","Created at"];
+const MSG_FIELDS = ["Request","From","Message","Created at"];
 const PHOTO_FIELD = { tenant: "Tenant photos", before: "Before photos", after: "After photos" };
 
 const norm = s => String(s == null ? "" : s).replace(/[\u2018\u2019]/g, "'").trim().toLowerCase();
@@ -65,7 +70,7 @@ async function loadSchema() {
       choices[t.name] = {};
       for (const f of t.fields || []) if (f.options && f.options.choices) choices[t.name][f.name] = f.options.choices.map(c => c.name);
     }
-    for (const [tName, list] of [[REQ_TABLE, REQ_FIELDS], [FB_TABLE, FB_FIELDS]]) {
+    for (const [tName, list] of [[REQ_TABLE, REQ_FIELDS], [FB_TABLE, FB_FIELDS], [MSG_TABLE, MSG_FIELDS]]) {
       if (!found[tName]) { missing.push("table: " + tName); continue; }
       for (const f of list) if (!found[tName].has(f)) missing.push(tName + ": " + f);
     }
@@ -121,6 +126,13 @@ function tenantOut(rec) {
   const j = jobOut(rec);
   return { id: j.id, ticket: j.ticket, status: j.status, category: j.category, visit: j.visit, createdAt: j.createdAt, finishedAt: j.finishedAt, reopened: j.reopened, afterPhotos: j.afterPhotos, byWorker: j.byWorker };
 }
+
+// Tenant <-> office messages. Workers never get these.
+function msgOut(rec) {
+  const f = rec.fields || {};
+  return { id: rec.id, req: (f["Request"] || [])[0] || "", from: codeOf(FROM, f["From"]) || "tenant", text: f["Message"] || "", at: ms(f["Created at"]) || ms(rec.createdTime) };
+}
+const threadOf = (msgs, id) => msgs.filter(m => m.req === id).sort((a, b) => (a.at || 0) - (b.at || 0));
 
 function bad(msg) { const e = new Error(msg); e.status = 400; return e; }
 const str = (v, max) => String(v == null ? "" : v).slice(0, max || 500);
@@ -186,6 +198,23 @@ async function allJobs() {
   return jobsCache;
 }
 
+let msgsCache = null, msgsAt = 0;
+async function allMsgs() {
+  if (msgsCache && Date.now() - msgsAt < CACHE_MS) return msgsCache;
+  msgsCache = (await listAll(MSG_TABLE)).map(msgOut); msgsAt = Date.now();
+  return msgsCache;
+}
+async function addMsg(id, from, text) {
+  await at("POST", tablePath(MSG_TABLE), { fields: { "Request": [id], "From": opt(MSG_TABLE, "From", FROM[from]), "Message": text }, typecast: true });
+  msgsCache = null;
+  return threadOf(await allMsgs(), id);
+}
+function msgText(b) {
+  const text = str(b.text, 2000).trim();
+  if (!text) throw bad("Write a message");
+  return text;
+}
+
 /* ---------- helpers ---------- */
 const send = (res, code, obj) => {
   res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
@@ -199,16 +228,21 @@ function readBody(req, limit) {
     req.on("error", reject);
   });
 }
-function pinOk(req) {
-  if (!PIN) return false;
-  const given = String(req.headers["x-worker-pin"] || "");
-  const a = crypto.createHash("sha256").update(given).digest();
-  const b = crypto.createHash("sha256").update(PIN).digest();
+function codeOk(given, secret) {
+  if (!secret) return false;
+  const a = crypto.createHash("sha256").update(String(given || "")).digest();
+  const b = crypto.createHash("sha256").update(secret).digest();
   return crypto.timingSafeEqual(a, b);
 }
+const pinOk = req => codeOk(req.headers["x-worker-pin"], PIN);
+const officeOk = req => codeOk(req.headers["x-office-pin"], OFFICE_PIN);
 function needPin(req) {
   if (!PIN) throw Object.assign(new Error("WORKER_PIN is not set on the server"), { status: 503 });
   if (!pinOk(req)) throw Object.assign(new Error("Wrong PIN"), { status: 401 });
+}
+function needOffice(req) {
+  if (!OFFICE_PIN) throw Object.assign(new Error("OFFICE_PIN is not set on the server"), { status: 503 });
+  if (!officeOk(req)) throw Object.assign(new Error("Wrong PIN"), { status: 401 });
 }
 const hits = new Map();
 function limit(req, max) {
@@ -222,6 +256,13 @@ const isRec = id => /^rec[A-Za-z0-9]{14}$/.test(id);
 const digits = s => String(s || "").replace(/\D/g, "");
 const esc = s => String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 const ticket = () => String(Date.now()).slice(-6);
+// Tenant proves a request is theirs with the phone + apartment they sent it with
+async function ownRec(id, b) {
+  if (!isRec(id)) throw bad("Bad id");
+  const rec = await getRec(id), f = rec.fields || {};
+  if (digits(f["Tenant phone"]) !== digits(b.phone) || norm(f["Apartment"]) !== norm(b.apt)) throw Object.assign(new Error("Not your request"), { status: 403 });
+  return rec;
+}
 
 async function uploadPhoto(id, field, b) {
   const type = String(b.contentType || "");
@@ -237,10 +278,10 @@ async function api(req, res, url) {
   const p = url.pathname, m = req.method;
   let r;
 
-  if (m === "GET" && p === "/api/config") return send(res, 200, { writeup: !!AI_KEY, pinSet: !!PIN });
+  if (m === "GET" && p === "/api/config") return send(res, 200, { writeup: !!AI_KEY, pinSet: !!PIN, officeSet: !!OFFICE_PIN });
 
   if (m === "GET" && p === "/api/health") {
-    needPin(req);
+    if (!officeOk(req)) needPin(req);
     if (!schema.loaded) await loadSchema();
     return send(res, 200, { ok: schema.loaded && !schema.missing.length, missing: schema.missing, error: schema.error });
   }
@@ -286,17 +327,46 @@ async function api(req, res, url) {
     if (ph.length < 7 || !apt) throw bad("Enter your phone and apartment");
     const formula = "AND(LOWER(TRIM({Apartment}&''))='" + esc(apt) + "',REGEX_REPLACE({Tenant phone}&'','[^0-9]','')='" + esc(ph) + "')";
     const recs = await listAll(REQ_TABLE, { filterByFormula: formula });
-    return send(res, 200, recs.map(tenantOut));
+    let msgs = [];
+    try { msgs = await allMsgs(); } catch (e) { console.error("Could not read messages:", e.message); }
+    // Messages only show on open (or reopened) requests, not finished ones
+    return send(res, 200, recs.map(rec => { const o = tenantOut(rec); o.messages = o.status === "done" ? [] : threadOf(msgs, o.id); return o; }));
+  }
+
+  // Tenant sends the office a message about one of their open requests
+  if (m === "POST" && (r = p.match(/^\/api\/my\/(rec\w+)\/messages$/))) {
+    limit(req, 60);
+    const b = await readBody(req, 8 * 1024);
+    const text = msgText(b);
+    const rec = await ownRec(r[1], b);
+    if (jobOut(rec).status === "done") throw Object.assign(new Error("This request is finished. Reopen it to send a message."), { status: 403 });
+    return send(res, 200, { messages: await addMsg(rec.id, "tenant", text) });
   }
 
   if (m === "POST" && (r = p.match(/^\/api\/my\/(rec\w+)\/reopen$/))) {
     limit(req, 40);
-    const id = r[1]; if (!isRec(id)) throw bad("Bad id");
     const b = await readBody(req, 4 * 1024);
-    const rec = await getRec(id), f = rec.fields || {};
-    if (digits(f["Tenant phone"]) !== digits(b.phone) || norm(f["Apartment"]) !== norm(b.apt)) throw Object.assign(new Error("Not your request"), { status: 403 });
+    const id = (await ownRec(r[1], b)).id;
     await patchRec(id, jobFields({ status: "received", reopened: true, finishedAt: null, startedAt: null, visit: null, blockReason: null }));
     return send(res, 200, { ok: true });
+  }
+
+  // Office: open requests plus finished ones that have messages
+  if (m === "GET" && p === "/api/office") {
+    needOffice(req);
+    const [jobs, msgs] = await Promise.all([allJobs(), allMsgs()]);
+    const out = jobs.map(j => Object.assign({}, j, { messages: threadOf(msgs, j.id) }))
+      .filter(j => j.status !== "done" || j.messages.length);
+    return send(res, 200, out);
+  }
+
+  if (m === "POST" && (r = p.match(/^\/api\/office\/(rec\w+)\/messages$/))) {
+    needOffice(req);
+    const id = r[1]; if (!isRec(id)) throw bad("Bad id");
+    const b = await readBody(req, 8 * 1024);
+    const text = msgText(b);
+    if (jobOut(await getRec(id)).status === "done") throw bad("This request is finished. The tenant can't see new messages.");
+    return send(res, 200, { messages: await addMsg(id, "office", text) });
   }
 
   // Worker: all jobs
@@ -401,5 +471,6 @@ server.listen(PORT, () => {
   console.log("MZS Field App running on port " + PORT);
   if (!TOKEN || !BASE) console.warn("Set AIRTABLE_TOKEN and AIRTABLE_BASE_ID in Render > Environment.");
   if (!PIN) console.warn("Set WORKER_PIN in Render > Environment.");
+  if (!OFFICE_PIN) console.warn("Set OFFICE_PIN in Render > Environment to turn on tenant messages.");
   if (TOKEN && BASE) loadSchema();
 });
