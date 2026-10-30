@@ -4,7 +4,7 @@
 //   AIRTABLE_BASE_ID   (required) starts with "app"
 //   WORKER_PIN         (required) code workers type to open the Worker side
 //   OFFICE_PIN         (required for tenant messages) code the office types to open the Office side
-//   ANTHROPIC_API_KEY  (optional) turns on the "Write it up for the office" button
+//   ANTHROPIC_API_KEY  (optional) turns on the "Write it up for the office" button and the tenant AI assistant
 //   ANTHROPIC_MODEL    (optional) defaults to claude-haiku-5-5
 "use strict";
 const http = require("http");
@@ -256,6 +256,13 @@ const isRec = id => /^rec[A-Za-z0-9]{14}$/.test(id);
 const digits = s => String(s || "").replace(/\D/g, "");
 const esc = s => String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 const ticket = () => String(Date.now()).slice(-6);
+// A tenant's own requests, found by the phone + apartment they sent them with
+function myRecs(phone, apt) {
+  const ph = digits(phone), a = str(apt, 40).trim().toLowerCase();
+  if (ph.length < 7 || !a) throw bad("Enter your phone and apartment");
+  const formula = "AND(LOWER(TRIM({Apartment}&''))='" + esc(a) + "',REGEX_REPLACE({Tenant phone}&'','[^0-9]','')='" + esc(ph) + "')";
+  return listAll(REQ_TABLE, { filterByFormula: formula });
+}
 // Tenant proves a request is theirs with the phone + apartment they sent it with
 async function ownRec(id, b) {
   if (!isRec(id)) throw bad("Bad id");
@@ -273,12 +280,123 @@ async function uploadPhoto(id, field, b) {
     { contentType: type, file: data, filename: str(b.filename || "photo", 100) }, "https://content.airtable.com");
 }
 
+/* ---------- tenant AI assistant ---------- */
+const ASSIST_TOOLS = [
+  { name: "get_my_requests", description: "Look up this tenant's own maintenance requests: status, scheduled visit, and recent office messages. Call this before answering any question about a request.",
+    input_schema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "propose_request", description: "Show the tenant a new maintenance request to confirm. Nothing is sent until the tenant taps Yes on the summary. Only call once you know the problem type and what is wrong.",
+    input_schema: { type: "object", properties: {
+      category: { type: "string", enum: Object.keys(CAT), description: "heat = no heat / hot water, leak = leak / water, electric = electric / lights, appliance, door = door / lock / window, pests, building = building / hallway, other" },
+      details: { type: "string", description: "Short description of the problem in the tenant's words" },
+      time_pref: { type: "string", enum: Object.keys(TIME), description: "Best time for maintenance to come in" }
+    }, required: ["category", "details", "time_pref"], additionalProperties: false } },
+  { name: "connect_to_office", description: "Send the tenant's question to the office chat on one of their open requests, when you don't have the answer or aren't allowed to answer it.",
+    input_schema: { type: "object", properties: {
+      request_id: { type: "string", description: "The id of the tenant's open request the question is about" },
+      question: { type: "string", description: "The tenant's question, in their words" }
+    }, required: ["request_id", "question"], additionalProperties: false } }
+];
+const HANDOFF = {
+  en: "Connecting you to the office... Your question was sent. Their reply will show up here and in My requests.",
+  es: "Conectándolo con la oficina... Su pregunta fue enviada. La respuesta aparecerá aquí y en Mis solicitudes."
+};
+
+function assistSystem(lang) {
+  return [
+    "You are the MZS maintenance assistant inside the MZS tenant app. You talk with one tenant at a time.",
+    "Reply in " + (lang === "es" ? "Spanish" : "English") + ". Keep replies short and plain: 1-4 sentences, no markdown headings.",
+    "",
+    "You can help with only these things:",
+    "1. Status of the tenant's own requests. Always call get_my_requests first; answer only from what it returns. Never guess dates or promise times.",
+    "2. Simple, safe fix-it tips a tenant can do themselves: resetting a tripped breaker, plunging a clogged toilet or drain, resetting a garbage disposal, checking thermostat settings or batteries, turning off a fixture's shut-off valve to stop a leak. If a fix needs tools, a ladder, opening walls or panels, gas, or wiring, don't give steps: offer to submit a request.",
+    "3. Submitting a new request. Ask for what's missing (what's wrong, details, best time: morning, afternoon, or anytime), then call propose_request. The tenant confirms on screen. Don't say it was sent.",
+    "",
+    "Rules:",
+    "- Fire, gas smell, flooding, sparks, or anyone in danger: tell them to call 911 now, then the MZS emergency line [MZS emergency line]. Nothing else first.",
+    "- Photos and videos can't be sent in this chat. If the tenant wants to send one, tell them to use the Report a problem form.",
+    "- If the tenant asks something about one of their requests that you don't have the answer to or aren't allowed to answer (for example changing the visit time, who is coming, costs, building policies, complaints), call connect_to_office. If they have more than one open request, ask which one first. If they have no open request, say so and offer to submit one.",
+    "- If the question has nothing to do with their requests or a repair, politely say you can only help with maintenance and offer to submit a request. Don't send it to the office.",
+    "- Don't make up information about the building, staff, schedules, or rules."
+  ].join("\n");
+}
+
+async function assist(b) {
+  const lang = b.lang === "es" ? "es" : "en";
+  // Text-only history from the app; must start with the tenant
+  const history = (Array.isArray(b.history) ? b.history : []).slice(-20)
+    .map(h => ({ role: h.role === "assistant" ? "assistant" : "user", content: str(h.text, 2000).trim() }))
+    .filter(h => h.content);
+  while (history.length && history[0].role !== "user") history.shift();
+  if (!history.length || history[history.length - 1].role !== "user") throw bad("Write a message");
+
+  const recs = await myRecs(b.phone, b.apt);
+  const mine = recs.map(jobOut).filter(j => !j.byWorker);
+  let msgs = [];
+  try { msgs = await allMsgs(); } catch (e) { console.error("Could not read messages:", e.message); }
+  const out = { reply: "", draft: null, handoff: null };
+
+  function runTool(name, input) {
+    if (name === "get_my_requests") {
+      if (!mine.length) return "This tenant has no requests.";
+      return JSON.stringify(mine.map(j => ({
+        request_id: j.id, ticket: j.ticket, problem: CAT[j.category], status: j.status === "done" ? "Fixed" : STATUS[j.status],
+        reopened: j.reopened, sent_on: j.createdAt ? new Date(j.createdAt).toISOString().slice(0, 10) : null,
+        visit: j.visit && j.status !== "done" ? j.visit.date + " (" + TIME[j.visit.slot] + ")" : null,
+        fixed_on: j.finishedAt ? new Date(j.finishedAt).toISOString().slice(0, 10) : null,
+        recent_office_messages: j.status === "done" ? [] : threadOf(msgs, j.id).slice(-3).map(m => m.from + ": " + m.text)
+      })));
+    }
+    if (name === "propose_request") {
+      if (!CAT[input.category]) throw new Error("Unknown category");
+      out.draft = { category: input.category, details: str(input.details, 2000).trim(), timePref: TIME[input.time_pref] ? input.time_pref : "anytime" };
+      return "Summary shown to the tenant with Yes / No buttons. In one short sentence, ask them to check it and tap Yes to send.";
+    }
+    if (name === "connect_to_office") {
+      const j = mine.find(x => x.id === input.request_id && x.status !== "done");
+      if (!j) throw new Error("That is not one of this tenant's open requests. Their open requests: " + (mine.filter(x => x.status !== "done").map(x => x.id + " (" + CAT[x.category] + ")").join(", ") || "none"));
+      out.handoff = { id: j.id, ticket: j.ticket, question: str(input.question, 2000).trim() };
+      return "Sent to the office.";
+    }
+    throw new Error("Unknown tool");
+  }
+
+  const messages = history.slice();
+  for (let i = 0; i < 6; i++) {
+    const ar = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": AI_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model: AI_MODEL, max_tokens: 4000, output_config: { effort: "low" }, system: assistSystem(lang), tools: ASSIST_TOOLS, messages })
+    });
+    const aj = await ar.json().catch(() => ({}));
+    if (!ar.ok) { console.error("Anthropic error:", aj && aj.error); throw Object.assign(new Error("The assistant isn't available right now"), { status: 502 }); }
+    if (aj.stop_reason === "refusal") break;
+    const content = aj.content || [];
+    out.reply = content.filter(c => c.type === "text").map(c => c.text).join("\n").trim();
+    if (aj.stop_reason !== "tool_use") break;
+    // Keep the full assistant turn (thinking + tool calls) and answer every tool call in one user turn
+    messages.push({ role: "assistant", content });
+    const results = [];
+    for (const c of content.filter(x => x.type === "tool_use")) {
+      try { results.push({ type: "tool_result", tool_use_id: c.id, content: runTool(c.name, c.input || {}) }); }
+      catch (e) { results.push({ type: "tool_result", tool_use_id: c.id, content: e.message, is_error: true }); }
+    }
+    messages.push({ role: "user", content: results });
+  }
+
+  if (out.handoff) {
+    await addMsg(out.handoff.id, "tenant", out.handoff.question || history[history.length - 1].content);
+    out.reply = HANDOFF[lang];
+  }
+  if (!out.reply) out.reply = lang === "es" ? "No pude contestar eso. Intente otra vez o use Mis solicitudes para escribir a la oficina." : "I couldn't answer that. Try again, or use My requests to message the office.";
+  return out;
+}
+
 /* ---------- routes ---------- */
 async function api(req, res, url) {
   const p = url.pathname, m = req.method;
   let r;
 
-  if (m === "GET" && p === "/api/config") return send(res, 200, { writeup: !!AI_KEY, pinSet: !!PIN, officeSet: !!OFFICE_PIN });
+  if (m === "GET" && p === "/api/config") return send(res, 200, { writeup: !!AI_KEY, assist: !!AI_KEY, pinSet: !!PIN, officeSet: !!OFFICE_PIN });
 
   if (m === "GET" && p === "/api/health") {
     if (!officeOk(req)) needPin(req);
@@ -323,10 +441,7 @@ async function api(req, res, url) {
   if (m === "POST" && p === "/api/my") {
     limit(req, 120);
     const b = await readBody(req, 4 * 1024);
-    const ph = digits(b.phone), apt = str(b.apt, 40).trim().toLowerCase();
-    if (ph.length < 7 || !apt) throw bad("Enter your phone and apartment");
-    const formula = "AND(LOWER(TRIM({Apartment}&''))='" + esc(apt) + "',REGEX_REPLACE({Tenant phone}&'','[^0-9]','')='" + esc(ph) + "')";
-    const recs = await listAll(REQ_TABLE, { filterByFormula: formula });
+    const recs = await myRecs(b.phone, b.apt);
     let msgs = [];
     try { msgs = await allMsgs(); } catch (e) { console.error("Could not read messages:", e.message); }
     // Messages only show on open (or reopened) requests, not finished ones
@@ -383,6 +498,14 @@ async function api(req, res, url) {
     if (!Object.keys(F).length) throw bad("Nothing to save");
     const rec = await patchRec(id, F);
     return send(res, 200, jobOut(rec));
+  }
+
+  // Tenant AI assistant: answers request status + simple fix-it tips, drafts requests, hands off to the office
+  if (m === "POST" && p === "/api/assist") {
+    limit(req, 60);
+    if (!AI_KEY) throw Object.assign(new Error("The assistant is not turned on"), { status: 503 });
+    const b = await readBody(req, 64 * 1024);
+    return send(res, 200, await assist(b));
   }
 
   if (m === "POST" && p === "/api/writeup") {
