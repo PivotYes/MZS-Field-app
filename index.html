@@ -82,6 +82,11 @@ input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{out
 .testbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:12px 0;padding:10px 12px;border-radius:12px;background:var(--blueSoft);font-size:15px}
 summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
 .fbdone{opacity:.6}
+.thread{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.msg{max-width:85%;padding:10px 12px;border-radius:14px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere;align-self:flex-start}
+.msg.me{align-self:flex-end;background:var(--blueSoft)}
+.msg .who{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:2px}
+.chat textarea{min-height:80px}
 </style>
 </head>
 <body>
@@ -139,6 +144,12 @@ const T = {
     lookupSub:"Enter the phone and apartment you used when you sent the request.", showMine:"Show my requests",
     tooBig:"A file was too big (5 MB max). Try a photo or a shorter video.", netErr:"Couldn’t reach the server. Check your connection and try again.",
     fbPinNote:"Workers can see all feedback after signing in with the PIN.", missingFields:"Airtable setup issue. Missing:",
+    office:"Office", officeName:"MZS Office", you:"You", msgUs:"Message the office", hideMsgs:"Hide messages",
+    msgHint:"Questions about this request? Send the office a message.", yourMsg:"Your message", sendMsg:"Send",
+    opinTitle:"Office sign-in", opinSub:"Enter the office PIN to see and answer tenant messages.", opinBtn:"Open messages",
+    officeTitle:"Tenant messages", needsReply:"NEEDS REPLY", openReq:"Open request", oOpen:"Open", oDone:"Finished",
+    oNone:"No open requests.", oNoneDone:"No finished requests with messages.", oBack:"‹ All requests",
+    noMsgs:"No messages yet.", reply:"Reply to tenant", chatClosed:"This request is finished. The tenant can message again if they reopen it.",
     cat:{heat:"No heat / hot water",leak:"Leak / water",electric:"Electric / lights",appliance:"Appliance",door:"Door / lock / window",pests:"Pests",building:"Building / hallway",other:"Something else"}
   },
   es:{
@@ -182,6 +193,12 @@ const T = {
     lookupSub:"Ingrese el teléfono y el apartamento que usó al enviar la solicitud.", showMine:"Ver mis solicitudes",
     tooBig:"Un archivo es muy grande (máx. 5 MB). Pruebe una foto o un video más corto.", netErr:"No se pudo conectar. Revise su conexión e intente otra vez.",
     fbPinNote:"Los técnicos ven todos los comentarios después de entrar con el PIN.",
+    office:"Oficina", officeName:"Oficina MZS", you:"Usted", msgUs:"Escribir a la oficina", hideMsgs:"Ocultar mensajes",
+    msgHint:"¿Preguntas sobre esta solicitud? Envíe un mensaje a la oficina.", yourMsg:"Su mensaje", sendMsg:"Enviar",
+    opinTitle:"Acceso de oficina", opinSub:"Ingrese el PIN de oficina para ver y contestar mensajes.", opinBtn:"Ver mensajes",
+    officeTitle:"Mensajes de inquilinos", needsReply:"SIN RESPUESTA", openReq:"Abrir solicitud", oOpen:"Abiertas", oDone:"Terminadas",
+    oNone:"No hay solicitudes abiertas.", oNoneDone:"No hay solicitudes terminadas con mensajes.", oBack:"‹ Todas las solicitudes",
+    noMsgs:"Todavía no hay mensajes.", reply:"Contestar al inquilino", chatClosed:"Esta solicitud está terminada. El inquilino puede escribir otra vez si la reabre.",
     cat:{heat:"Sin calefacción / agua caliente",leak:"Fuga / agua",electric:"Electricidad / luces",appliance:"Electrodoméstico",door:"Puerta / cerradura / ventana",pests:"Plagas",building:"Edificio / pasillo",other:"Otra cosa"}
   }
 };
@@ -199,9 +216,11 @@ const store={
 let saved={}; try{saved=JSON.parse(store.get("mzs-me")||"{}")||{}}catch(e){saved={}}
 const S={
   lang: store.get("mzs-lang")==="es"?"es":"en",
-  role: store.get("mzs-role")==="worker"?"worker":"tenant",
+  role: ["worker","office"].includes(store.get("mzs-role"))?store.get("mzs-role"):"tenant",
   view:"form", cfg:{writeup:false,pinSet:true}, health:null,
   pin: store.get("mzs-pin")||"", authed:false, pinErr:"", pinBusy:false,
+  opin: store.get("mzs-opin")||"", oauthed:false, office:[], oLoaded:false, oTab:"open", oId:null,
+  chat:{}, chatOpen:{}, chatBusy:{}, chatErr:{},
   jobs:[], loaded:false, jobId:null, workerTab:"open",
   draft:{building:saved.building||"",apt:saved.apt||"",phone:saved.phone||"",name:saved.name||"",category:"",details:"",timePref:"anytime"},
   files:[], sending:false, formErr:"", lastTicket:"", fromWorker:false,
@@ -209,7 +228,7 @@ const S={
   notes:{}, writeups:{}, sched:{}, busy:{}, flash:{}, err:{},
   fb:[], fbDraft:{screen:"general",kind:"change",text:""}, fbSending:false, fbErr:"", fbSent:false, prevView:null
 };
-S.view = S.role==="worker" ? "jobs" : "form";
+S.view = S.role==="worker" ? "jobs" : S.role==="office" ? "office" : "form";
 
 const t=k=>T[S.lang][k]??T.en[k]??k;
 const catName=c=>(T[S.lang].cat[c]||T.en.cat[c]||c);
@@ -224,12 +243,14 @@ const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth
 async function api(method,path,body){
   const h={"Content-Type":"application/json"};
   if(S.pin) h["x-worker-pin"]=S.pin;
+  if(S.opin) h["x-office-pin"]=S.opin;
   let r;
   try{ r=await fetch(path,{method,headers:h,body:body?JSON.stringify(body):undefined}); }
   catch(e){ throw Object.assign(new Error(t("netErr")),{status:0}); }
   const j=await r.json().catch(()=>({}));
   if(!r.ok){
-    if(r.status===401&&S.authed){ S.authed=false; S.pin=""; store.del("mzs-pin"); if(S.role==="worker"){S.view="pin"; S.pinErr=t("pinWrong");} render(); }
+    if(r.status===401&&path.startsWith("/api/office")){ if(S.oauthed||S.opin){ S.oauthed=false; S.opin=""; store.del("mzs-opin"); if(S.role==="office"){S.view="opin"; S.pinErr=t("pinWrong");} render(); } }
+    else if(r.status===401&&S.authed){ S.authed=false; S.pin=""; store.del("mzs-pin"); if(S.role==="worker"){S.view="pin"; S.pinErr=t("pinWrong");} render(); }
     throw Object.assign(new Error(j.error||t("saveErr")),{status:r.status});
   }
   return j;
@@ -244,6 +265,10 @@ async function loadMine(){
   try{ S.mine=await api("POST","/api/my",{phone:S.lookup.phone,apt:S.lookup.apt}); S.mineErr=""; }
   catch(e){ S.mineErr=e.message; }
   S.mineBusy=false; S.mineLoaded=true; soft();
+}
+async function loadOffice(){
+  try{ S.office=await api("GET","/api/office"); S.oLoaded=true; S.oauthed=true; soft(); return true; }
+  catch(e){ S.oLoaded=true; soft(); return false; }
 }
 async function loadFb(){ if(!S.authed) return; try{ S.fb=await api("GET","/api/feedback"); soft(); }catch(e){} }
 function putJob(j){ const i=S.jobs.findIndex(x=>x.id===j.id); if(i>=0) S.jobs[i]=j; else S.jobs.push(j); }
@@ -287,6 +312,7 @@ function header(){
      <div class="seg" role="group" aria-label="View as">
        <button data-act="role" data-v="tenant" aria-pressed="${S.role==="tenant"}">${t("tenant")}</button>
        <button data-act="role" data-v="worker" aria-pressed="${S.role==="worker"}">${t("worker")}</button>
+       <button data-act="role" data-v="office" aria-pressed="${S.role==="office"}">${t("office")}</button>
      </div>
      <div class="seg" role="group" aria-label="Language">
        <button data-act="lang" data-v="en" aria-pressed="${S.lang==="en"}">EN</button>
@@ -296,7 +322,7 @@ function header(){
 }
 function banners(){
   let h=S.view==="feedback"?"":`<div class="testbar"><span><b>${t("testing")}</b> ${t("testingSub")}</span><button class="btn sm primary" data-act="toFb">${t("giveFb")}</button></div>`;
-  if(S.authed&&S.health&&S.health.missing&&S.health.missing.length) h+=`<div class="alert">${t("missingFields")} ${esc(S.health.missing.join(", "))}</div>`;
+  if((S.authed||S.oauthed)&&S.health&&S.health.missing&&S.health.missing.length) h+=`<div class="alert">${t("missingFields")} ${esc(S.health.missing.join(", "))}</div>`;
   return h;
 }
 function render(){
@@ -305,7 +331,10 @@ function render(){
   if(S.view==="form") h+=vForm();
   else if(S.view==="sent") h+=vSent();
   else if(S.view==="mine") h+=vMine();
-  else if(S.view==="pin") h+=vPin();
+  else if(S.view==="pin") h+=vPin("worker");
+  else if(S.view==="opin") h+=vPin("office");
+  else if(S.view==="office") h+=vOffice();
+  else if(S.view==="officeReq") h+=vOfficeReq();
   else if(S.view==="jobs") h+=vJobs();
   else if(S.view==="job") h+=vJob();
   else if(S.view==="feedback") h+=vFeedback();
@@ -369,7 +398,9 @@ function vMine(){
     ${j.status!=="done"?stepsHtml(j):""}
     ${j.visit&&j.status!=="done"?`<p class="meta" style="margin-top:10px"><b>${t("visit")}:</b> ${esc(fmtVisit(j.visit))}</p>`:""}
     ${j.status==="done"&&j.afterPhotos&&j.afterPhotos.length?`<div class="photos">${photoHtml(j.afterPhotos)}</div>`:""}
-    ${j.status==="done"?`<div class="row"><button class="btn sm" data-act="reopen" data-id="${esc(j.id)}">${t("reopen")}</button></div>`:""}
+    ${j.status==="done"?`<div class="row"><button class="btn sm" data-act="reopen" data-id="${esc(j.id)}">${t("reopen")}</button></div>`:`
+    <div class="row"><button class="btn sm" data-act="chat" data-id="${esc(j.id)}" aria-expanded="${!!S.chatOpen[j.id]}">${S.chatOpen[j.id]?t("hideMsgs"):t("msgUs")}${(j.messages||[]).length?` (${j.messages.length})`:""}</button></div>
+    ${S.chatOpen[j.id]?chatHtml(j,"tenant"):""}`}
   </div>`;
   return `<button class="link back" data-act="newForm">‹ ${t("reportTitle")}</button>
   <h1>${t("myRequests")}</h1>
@@ -387,13 +418,67 @@ function vMine(){
   ${past.length?`<h2>${t("past")}</h2>${past.map(card).join("")}`:""}
   <div style="margin-top:16px"><button class="btn block" data-act="newForm">${t("newReq")}</button></div>`;
 }
-function vPin(){
-  return `<h1>${t("pinTitle")}</h1>
-  <p class="sub">${t("pinSub")}</p>
+// Tenant <-> office thread. "me" is whose bubbles go on the right.
+function chatHtml(j,me){
+  const id=j.id, msgs=j.messages||[], busy=S.chatBusy[id];
+  const who=m=>m.from==="office"?t("officeName"):me==="tenant"?t("you"):(j.name||t("tenant"));
+  return `<div class="chat">
+    ${msgs.length?`<div class="thread">${msgs.map(m=>`<div class="msg ${m.from===me?"me":""}"><span class="who">${esc(who(m))} · ${fmtDate(m.at)} ${fmtTime(m.at)}</span>${esc(m.text)}</div>`).join("")}</div>`
+      :`<p class="meta" style="margin-top:10px">${me==="tenant"?t("msgHint"):t("noMsgs")}</p>`}
+    <label for="c-${esc(id)}">${me==="tenant"?t("yourMsg"):t("reply")}</label>
+    <textarea id="c-${esc(id)}" data-chat="${esc(id)}">${esc(S.chat[id]||"")}</textarea>
+    <div class="row"><button class="btn sm primary" data-act="chatSend" data-id="${esc(id)}" ${busy?"disabled":""}>${busy?t("sending"):t("sendMsg")}</button></div>
+    ${S.chatErr[id]?`<p class="err" role="alert">${esc(S.chatErr[id])}</p>`:""}
+  </div>`;
+}
+function vPin(kind){
+  const o=kind==="office";
+  return `<h1>${t(o?"opinTitle":"pinTitle")}</h1>
+  <p class="sub">${t(o?"opinSub":"pinSub")}</p>
   <label for="p-pin">${t("pin")}</label>
-  <input id="p-pin" type="password" inputmode="numeric" autocomplete="current-password" data-pin="1">
+  <input id="p-pin" type="password" inputmode="numeric" autocomplete="current-password" data-pin="${kind}">
   ${S.pinErr?`<p class="err" role="alert">${esc(S.pinErr)}</p>`:""}
-  <div style="margin-top:16px"><button class="btn primary block" data-act="pinGo" ${S.pinBusy?"disabled":""}>${S.pinBusy?t("loading"):t("pinBtn")}</button></div>`;
+  <div style="margin-top:16px"><button class="btn primary block" data-act="pinGo" data-v="${kind}" ${S.pinBusy?"disabled":""}>${S.pinBusy?t("loading"):t(o?"opinBtn":"pinBtn")}</button></div>`;
+}
+const lastMsg=j=>(j.messages||[])[(j.messages||[]).length-1];
+const needsReply=j=>j.status!=="done"&&lastMsg(j)&&lastMsg(j).from==="tenant";
+function vOffice(){
+  const recent=j=>(lastMsg(j)&&lastMsg(j).at)||j.createdAt||0;
+  const open=S.office.filter(j=>j.status!=="done").sort((a,b)=>(needsReply(b)?1:0)-(needsReply(a)?1:0)||recent(b)-recent(a));
+  const done=S.office.filter(j=>j.status==="done").sort((a,b)=>recent(b)-recent(a));
+  const list=S.oTab==="open"?open:done, waiting=open.filter(needsReply).length;
+  const card=j=>{ const m=lastMsg(j); return `<div class="card">
+    <div class="tags">${needsReply(j)?`<span class="tag urg">${t("needsReply")}</span>`:""}${tagsFor(j)}</div>
+    <p class="ttl">${esc(catName(j.category))}</p>
+    <p class="meta">${esc(j.building||"[Building address]")} · ${t("apt")} ${esc(j.apt)} · ${t("ticket")} #${esc(j.ticket)}</p>
+    ${m?`<p class="meta" style="margin-top:6px"><b>${esc(m.from==="office"?t("officeName"):(j.name||t("tenant")))}:</b> ${esc(m.text.length>120?m.text.slice(0,120)+"…":m.text)}</p>`:""}
+    <div class="row"><button class="btn sm primary" data-act="openReq" data-id="${esc(j.id)}">${t("openReq")}</button></div></div>`; };
+  return `<h1>${t("officeTitle")}</h1>
+  <p class="sub">${waiting} ${t("needsReply").toLowerCase()} · <button class="link" style="padding:0;min-height:0" data-act="oSignOut">${t("signOut")}</button></p>
+  <div class="seg" role="group" aria-label="Requests">
+    <button data-act="otab" data-v="open" aria-pressed="${S.oTab==="open"}">${t("oOpen")} (${open.length})</button>
+    <button data-act="otab" data-v="done" aria-pressed="${S.oTab==="done"}">${t("oDone")} (${done.length})</button>
+  </div>
+  ${!S.oLoaded?`<p class="empty">${t("loading")}</p>`:!list.length?`<p class="empty">${S.oTab==="open"?t("oNone"):t("oNoneDone")}</p>`:list.map(card).join("")}`;
+}
+function vOfficeReq(){
+  const j=S.office.find(x=>x.id===S.oId);
+  if(!j) return `<button class="link back" data-act="toOffice">${t("oBack")}</button><p class="empty">${S.oLoaded?"—":t("loading")}</p>`;
+  return `<button class="link back" data-act="toOffice">${t("oBack")}</button>
+  <div class="tags" style="margin-top:4px">${tagsFor(j)}${j.reopened&&j.status!=="done"?`<span class="tag">${t("reopened").toUpperCase()}</span>`:""}</div>
+  <h1 style="margin-top:4px">${esc(catName(j.category))}</h1>
+  <p class="sub">${esc(j.building||"[Building address]")} · ${t("apt")} ${esc(j.apt)} · ${t("ticket")} #${esc(j.ticket)}</p>
+  <div class="card">
+    ${j.details?`<p class="meta"><b>${t("officeNote")}:</b> ${esc(j.details)}</p>`:""}
+    <p class="meta">${j.name?esc(j.name)+" · ":""}${t("sentOn")} ${fmtDate(j.createdAt)}${j.visit&&j.status!=="done"?` · ${t("visit")}: ${esc(fmtVisit(j.visit))}`:""}</p>
+    ${j.phone?`<div class="row"><a class="btn sm" href="tel:${esc(String(j.phone).replace(/[^\d+]/g,""))}">${t("call")}</a></div>`:""}
+  </div>
+  <div class="card">
+    <p class="ttl">${t("officeTitle")}</p>
+    ${j.status==="done"
+      ?((j.messages||[]).length?`<div class="thread">${j.messages.map(m=>`<div class="msg ${m.from==="office"?"me":""}"><span class="who">${esc(m.from==="office"?t("officeName"):(j.name||t("tenant")))} · ${fmtDate(m.at)} ${fmtTime(m.at)}</span>${esc(m.text)}</div>`).join("")}</div>`:"")+`<p class="meta" style="margin-top:10px">${t("chatClosed")}</p>`
+      :chatHtml(j,"office")}
+  </div>`;
 }
 const RANK={in_progress:0,scheduled:1,received:2,blocked:3};
 function tagsFor(j){
@@ -559,13 +644,35 @@ async function tryPin(pin){
   render();
 }
 
+async function tryOfficePin(pin){
+  S.opin=pin; S.pinBusy=true; S.pinErr=""; render();
+  const ok=await loadOffice();
+  S.pinBusy=false;
+  if(ok){ S.oauthed=true; store.set("mzs-opin",pin); S.view="office"; try{S.health=await api("GET","/api/health")}catch(e){} }
+  else { S.opin=""; S.pinErr=t("pinWrong"); }
+  render();
+}
+async function chatSend(id){
+  const text=(S.chat[id]||"").trim(); if(!text) return;
+  const office=S.view==="officeReq";
+  S.chatBusy[id]=1; render();
+  try{
+    const r=office?await api("POST","/api/office/"+id+"/messages",{text})
+      :await api("POST","/api/my/"+id+"/messages",{phone:S.lookup.phone,apt:S.lookup.apt,text});
+    const j=(office?S.office:S.mine).find(x=>x.id===id); if(j) j.messages=r.messages;
+    delete S.chat[id]; delete S.chatErr[id];
+  }catch(e){ S.chatErr[id]=e.message||t("saveErr"); }
+  delete S.chatBusy[id]; render();
+}
+
 /* ---------- events ---------- */
 function goWorker(){ S.view=S.authed?"jobs":"pin"; if(S.authed) loadJobs(); }
+function goOffice(){ S.view=S.oauthed?"office":"opin"; S.pinErr=""; if(S.oauthed) loadOffice(); }
 document.addEventListener("click",async ev=>{
   const b=ev.target.closest("[data-act]"); if(!b||b.disabled) return;
   const a=b.dataset.act, v=b.dataset.v, id=b.dataset.id;
   if(a==="pickFiles"||a==="jobPhoto") return;
-  if(a==="role"){ S.role=v; store.set("mzs-role",v); S.fromWorker=false; if(v==="worker") goWorker(); else S.view="form"; render(); window.scrollTo(0,0); return; }
+  if(a==="role"){ S.role=v; store.set("mzs-role",v); S.fromWorker=false; if(v==="worker") goWorker(); else if(v==="office") goOffice(); else S.view="form"; render(); window.scrollTo(0,0); return; }
   if(a==="lang"){ S.lang=v; store.set("mzs-lang",v); render(); return; }
   if(a==="cat"){ S.draft.category=v; render(); return; }
   if(a==="time"){ S.draft.timePref=v; render(); return; }
@@ -574,7 +681,13 @@ document.addEventListener("click",async ev=>{
   if(a==="lookup"){ S.lookup={phone:S.lookup.phone.trim(),apt:S.lookup.apt.trim()}; loadMine(); render(); return; }
   if(a==="newForm"){ S.view="form"; S.formErr=""; render(); window.scrollTo(0,0); return; }
   if(a==="toJobs"){ S.view="jobs"; S.fromWorker=false; render(); window.scrollTo(0,0); return; }
-  if(a==="pinGo"){ const el=document.getElementById("p-pin"); const p=el?el.value.trim():""; if(p) tryPin(p); return; }
+  if(a==="pinGo"){ const el=document.getElementById("p-pin"); const p=el?el.value.trim():""; if(p){ if(v==="office") tryOfficePin(p); else tryPin(p); } return; }
+  if(a==="oSignOut"){ S.oauthed=false; S.opin=""; S.office=[]; store.del("mzs-opin"); S.view="opin"; render(); return; }
+  if(a==="otab"){ S.oTab=v; render(); return; }
+  if(a==="openReq"){ S.oId=id; S.view="officeReq"; render(); window.scrollTo(0,0); loadOffice(); return; }
+  if(a==="toOffice"){ S.view="office"; render(); window.scrollTo(0,0); return; }
+  if(a==="chat"){ S.chatOpen[id]=!S.chatOpen[id]; render(); return; }
+  if(a==="chatSend"){ chatSend(id); return; }
   if(a==="signOut"){ S.authed=false; S.pin=""; S.jobs=[]; S.fb=[]; store.del("mzs-pin"); S.view="pin"; render(); return; }
   if(a==="wtab"){ S.workerTab=v; render(); return; }
   if(a==="openJob"){ S.jobId=id; S.view="job"; render(); window.scrollTo(0,0); return; }
@@ -593,7 +706,7 @@ document.addEventListener("click",async ev=>{
     if(await upd(id,patch)){ delete S.notes[id]; delete S.writeups[id]; S.view="jobs"; render(); window.scrollTo(0,0);} return; }
   if(a==="block"){ if(await upd(id,{status:"blocked",blockReason:v})){ S.view="jobs"; render(); window.scrollTo(0,0);} return; }
   if(a==="toFb"){ S.prevView=S.view; S.fbDraft.screen=({form:"tenantForm",sent:"tenantForm",mine:"tenantMine",jobs:"workerJobs",job:"workerJob",pin:"workerJobs"})[S.view]||"general"; S.fbErr=""; S.view="feedback"; render(); window.scrollTo(0,0); loadFb(); return; }
-  if(a==="fbBack"){ S.view=S.prevView||(S.role==="worker"?"jobs":"form"); render(); window.scrollTo(0,0); return; }
+  if(a==="fbBack"){ S.view=S.prevView||(S.role==="worker"?"jobs":S.role==="office"?"office":"form"); render(); window.scrollTo(0,0); return; }
   if(a==="fbKind"){ S.fbDraft.kind=v; render(); return; }
   if(a==="fbSend"){ const d=S.fbDraft; if(!d.text.trim()){ S.fbErr=t("fbNeed"); render(); return; }
     S.fbErr=""; S.fbSending=true; render();
@@ -602,11 +715,12 @@ document.addEventListener("click",async ev=>{
     S.fbSending=false; render(); return; }
   if(a==="fbHandled"){ const f=S.fb.find(x=>x.id===id); if(!f) return; try{ await api("PATCH","/api/feedback/"+id,{handled:!f.handled}); f.handled=!f.handled; render(); }catch(e){} return; }
 });
-document.addEventListener("keydown",ev=>{ if(ev.key==="Enter"&&ev.target.dataset&&ev.target.dataset.pin){ const p=ev.target.value.trim(); if(p) tryPin(p); } });
+document.addEventListener("keydown",ev=>{ if(ev.key==="Enter"&&ev.target.dataset&&ev.target.dataset.pin){ const p=ev.target.value.trim(); if(p){ if(ev.target.dataset.pin==="office") tryOfficePin(p); else tryPin(p); } } });
 document.addEventListener("input",ev=>{
   const el=ev.target;
   if(el.dataset.f){ S.draft[el.dataset.f]=el.value; return; }
   if(el.dataset.lk){ S.lookup[el.dataset.lk]=el.value; return; }
+  if(el.dataset.chat){ S.chat[el.dataset.chat]=el.value; return; }
   if(el.dataset.fb){ S.fbDraft.text=el.value; return; }
   if(el.dataset.notes){ S.notes[el.dataset.notes]=el.value; return; }
   if(el.dataset.wu){ S.writeups[el.dataset.wu]=el.value; return; }
@@ -633,11 +747,14 @@ render();
 (async()=>{
   try{ S.cfg=await api("GET","/api/config"); }catch(e){}
   if(S.pin){ const ok=await loadJobs(); if(ok){ S.authed=true; try{S.health=await api("GET","/api/health")}catch(e){} } else { S.pin=""; store.del("mzs-pin"); } }
+  if(S.opin){ const ok=await loadOffice(); if(ok){ S.oauthed=true; if(!S.health) try{S.health=await api("GET","/api/health")}catch(e){} } else { S.opin=""; store.del("mzs-opin"); } }
   if(S.role==="worker") S.view=S.authed?"jobs":"pin";
+  if(S.role==="office") S.view=S.oauthed?"office":"opin";
   render();
   setInterval(()=>{
     if(document.hidden) return;
     if(S.role==="worker"&&S.authed&&(S.view==="jobs"||S.view==="job")) loadJobs();
+    else if(S.role==="office"&&S.oauthed&&(S.view==="office"||S.view==="officeReq")) loadOffice();
     else if(S.view==="mine"&&S.lookup.phone&&S.lookup.apt) loadMine();
     else if(S.view==="feedback"&&S.authed) loadFb();
   },60000);
