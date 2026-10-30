@@ -87,6 +87,8 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
 .msg.me{align-self:flex-end;background:var(--blueSoft)}
 .msg .who{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:2px}
 .chat textarea{min-height:80px}
+.draft{border:1.5px solid var(--blue);border-radius:14px;padding:12px;background:var(--card);align-self:stretch}
+.draft p{margin:2px 0}
 </style>
 </head>
 <body>
@@ -149,6 +151,10 @@ const T = {
     opinTitle:"Office sign-in", opinSub:"Enter the office PIN to see and answer tenant messages.", opinBtn:"Open messages",
     officeTitle:"Tenant messages", needsReply:"NEEDS REPLY", openReq:"Open request", oOpen:"Open", oDone:"Finished",
     oNone:"No open requests.", oNoneDone:"No finished requests with messages.", oBack:"‹ All requests",
+    askQ:"Ask a question", askTitle:"Ask a question", askHi:"Hi! I can check on your requests, help with simple fixes, or send a new request. What do you need?",
+    askIdNeed:"First, enter the phone and apartment you use with MZS.", askStart:"Start", thinking:"Thinking…", startOver:"Start over",
+    askPhotoNote:"To send a photo, use the Report a problem form.", draftTitle:"Send this request?", draftYes:"Yes, send it", draftNo:"No",
+    draftSent:"Sent ✓ Ticket", draftCancelled:"Not sent.", draftSentMsg:"Sent! Your ticket number is", askOff:"The assistant isn’t turned on yet.",
     noMsgs:"No messages yet.", reply:"Reply to tenant", chatClosed:"This request is finished. The tenant can message again if they reopen it.",
     cat:{heat:"No heat / hot water",leak:"Leak / water",electric:"Electric / lights",appliance:"Appliance",door:"Door / lock / window",pests:"Pests",building:"Building / hallway",other:"Something else"}
   },
@@ -198,6 +204,10 @@ const T = {
     opinTitle:"Acceso de oficina", opinSub:"Ingrese el PIN de oficina para ver y contestar mensajes.", opinBtn:"Ver mensajes",
     officeTitle:"Mensajes de inquilinos", needsReply:"SIN RESPUESTA", openReq:"Abrir solicitud", oOpen:"Abiertas", oDone:"Terminadas",
     oNone:"No hay solicitudes abiertas.", oNoneDone:"No hay solicitudes terminadas con mensajes.", oBack:"‹ Todas las solicitudes",
+    askQ:"Hacer una pregunta", askTitle:"Hacer una pregunta", askHi:"¡Hola! Puedo revisar sus solicitudes, ayudar con arreglos sencillos o enviar una solicitud nueva. ¿Qué necesita?",
+    askIdNeed:"Primero, ingrese el teléfono y el apartamento que usa con MZS.", askStart:"Empezar", thinking:"Pensando…", startOver:"Empezar de nuevo",
+    askPhotoNote:"Para enviar una foto, use el formulario Reportar un problema.", draftTitle:"¿Enviar esta solicitud?", draftYes:"Sí, enviar", draftNo:"No",
+    draftSent:"Enviada ✓ Ticket", draftCancelled:"No se envió.", draftSentMsg:"¡Enviada! Su número de ticket es", askOff:"El asistente todavía no está activado.",
     noMsgs:"Todavía no hay mensajes.", reply:"Contestar al inquilino", chatClosed:"Esta solicitud está terminada. El inquilino puede escribir otra vez si la reabre.",
     cat:{heat:"Sin calefacción / agua caliente",leak:"Fuga / agua",electric:"Electricidad / luces",appliance:"Electrodoméstico",door:"Puerta / cerradura / ventana",pests:"Plagas",building:"Edificio / pasillo",other:"Otra cosa"}
   }
@@ -221,6 +231,7 @@ const S={
   pin: store.get("mzs-pin")||"", authed:false, pinErr:"", pinBusy:false,
   opin: store.get("mzs-opin")||"", oauthed:false, office:[], oLoaded:false, oTab:"open", oId:null,
   chat:{}, chatOpen:{}, chatBusy:{}, chatErr:{},
+  ai:{items:[],handoffs:[],text:"",busy:false,err:""},
   jobs:[], loaded:false, jobId:null, workerTab:"open",
   draft:{building:saved.building||"",apt:saved.apt||"",phone:saved.phone||"",name:saved.name||"",category:"",details:"",timePref:"anytime"},
   files:[], sending:false, formErr:"", lastTicket:"", fromWorker:false,
@@ -228,6 +239,9 @@ const S={
   notes:{}, writeups:{}, sched:{}, busy:{}, flash:{}, err:{},
   fb:[], fbDraft:{screen:"general",kind:"change",text:""}, fbSending:false, fbErr:"", fbSent:false, prevView:null
 };
+// AI chat stays on this phone only, so the tenant can come back to it
+try{ const a=JSON.parse(store.get("mzs-ai")||"{}"); if(Array.isArray(a.items)) S.ai.items=a.items; if(Array.isArray(a.handoffs)) S.ai.handoffs=a.handoffs; }catch(e){}
+const saveAi=()=>store.set("mzs-ai",JSON.stringify({items:S.ai.items.slice(-40),handoffs:S.ai.handoffs.slice(-20)}));
 S.view = S.role==="worker" ? "jobs" : S.role==="office" ? "office" : "form";
 
 const t=k=>T[S.lang][k]??T.en[k]??k;
@@ -331,6 +345,7 @@ function render(){
   if(S.view==="form") h+=vForm();
   else if(S.view==="sent") h+=vSent();
   else if(S.view==="mine") h+=vMine();
+  else if(S.view==="assist") h+=vAssist();
   else if(S.view==="pin") h+=vPin("worker");
   else if(S.view==="opin") h+=vPin("office");
   else if(S.view==="office") h+=vOffice();
@@ -347,7 +362,7 @@ function vForm(){
   return `
   ${S.fromWorker?`<button class="link back" data-act="toJobs">${t("back")}</button>`:""}
   <h1>${t("reportTitle")}</h1>
-  ${S.fromWorker?"":`<button class="link" data-act="toMine">${t("myReq")} ›</button>`}
+  ${S.fromWorker?"":`<div class="row" style="margin-top:0;align-items:center"><button class="link" data-act="toMine">${t("myReq")} ›</button>${S.cfg.assist?`<button class="btn sm" data-act="toAssist">💬 ${t("askQ")}</button>`:""}</div>`}
   <div class="alert">${t("emergency")}</div>
   <label for="f-building">${t("building")}</label>
   <input id="f-building" type="text" data-f="building" value="${esc(d.building)}" autocomplete="street-address">
@@ -416,7 +431,50 @@ function vMine(){
   ${S.mineLoaded&&!list.length&&!S.mineErr?`<p class="empty">${t("noReq")}</p>`:""}
   ${open.length?`<h2>${t("open")}</h2>${open.map(card).join("")}`:""}
   ${past.length?`<h2>${t("past")}</h2>${past.map(card).join("")}`:""}
-  <div style="margin-top:16px"><button class="btn block" data-act="newForm">${t("newReq")}</button></div>`;
+  ${S.cfg.assist?`<div style="margin-top:16px"><button class="btn block" data-act="toAssist">💬 ${t("askQ")}</button></div>`:""}
+  <div style="margin-top:8px"><button class="btn block" data-act="newForm">${t("newReq")}</button></div>`;
+}
+// Tenant AI chat. Office replies to questions it handed off show up here too.
+function vAssist(){
+  const back=`<button class="link back" data-act="newForm">‹ ${t("reportTitle")}</button><h1>${t("askTitle")}</h1>`;
+  if(!S.cfg.assist) return back+`<p class="empty">${t("askOff")}</p>`;
+  if(!S.lookup.phone.trim()||!S.lookup.apt.trim()) return back+`<div class="card">
+    <p class="meta" style="margin-top:0">${t("askIdNeed")}</p>
+    <label for="a-phone" style="margin-top:8px">${t("phone")}</label>
+    <input id="a-phone" type="tel" data-lk="phone" value="${esc(S.lookup.phone)}" autocomplete="tel">
+    <label for="a-apt">${t("apt")}</label>
+    <input id="a-apt" type="text" data-lk="apt" value="${esc(S.lookup.apt)}">
+    <div class="row"><button class="btn primary" data-act="askStart">${t("askStart")}</button></div></div>`;
+  const office=[], seen=new Set();
+  for(const h of S.ai.handoffs){ const j=S.mine.find(x=>x.id===h.id); if(!j) continue;
+    for(const m of j.messages||[]) if(m.from==="office"&&m.at>=h.at&&!seen.has(m.id)){ seen.add(m.id); office.push({role:"office",text:m.text,at:m.at}); } }
+  const list=S.ai.items.concat(office).sort((a,b)=>(a.at||0)-(b.at||0));
+  const bubble=it=>{
+    if(it.draft){ const d=it.draft, k=S.ai.items.indexOf(it);
+      return `<div class="draft"><p class="ttl" style="font-size:17px">${t("draftTitle")}</p>
+        <p class="meta"><b>${esc(catName(d.category))}</b> · ${t("apt")} ${esc(S.lookup.apt)}</p>
+        ${d.details?`<p class="meta">${esc(d.details)}</p>`:""}
+        <p class="meta">${t("best")}: ${t(d.timePref)}</p>
+        <p class="small">${t("askPhotoNote")}</p>
+        ${it.sent?`<p class="meta" style="color:var(--ok)"><b>${t("draftSent")} #${esc(it.sent)}</b></p>`:it.cancelled?`<p class="meta">${t("draftCancelled")}</p>`
+          :`<div class="row"><button class="btn sm primary" data-act="draftYes" data-v="${k}" ${it.busy?"disabled":""}>${it.busy?t("sending"):t("draftYes")}</button><button class="btn sm" data-act="draftNo" data-v="${k}">${t("draftNo")}</button></div>`}
+      </div>`; }
+    const who=it.role==="user"?t("you"):it.role==="office"?t("officeName"):"MZS";
+    return `<div class="msg ${it.role==="user"?"me":""}"><span class="who">${esc(who)}${it.at?` · ${fmtTime(it.at)}`:""}</span>${esc(it.text)}</div>`;
+  };
+  return back+`<div class="card chat">
+    <div class="thread">
+      <div class="msg"><span class="who">MZS</span>${t("askHi")}</div>
+      ${list.map(bubble).join("")}
+      ${S.ai.busy?`<div class="msg"><span class="who">MZS</span>${t("thinking")}</div>`:""}
+    </div>
+    <label for="ai-text">${t("yourMsg")}</label>
+    <textarea id="ai-text" data-ai="1">${esc(S.ai.text)}</textarea>
+    <div class="row"><button class="btn sm primary" data-act="askSend" ${S.ai.busy?"disabled":""}>${t("sendMsg")}</button>
+    ${S.ai.items.length?`<button class="btn sm" data-act="askReset">${t("startOver")}</button>`:""}</div>
+    ${S.ai.err?`<p class="err" role="alert">${esc(S.ai.err)}</p>`:""}
+  </div>
+  <p class="small">${t("emergency")}</p>`;
 }
 // Tenant <-> office thread. "me" is whose bubbles go on the right.
 function chatHtml(j,me){
@@ -652,6 +710,29 @@ async function tryOfficePin(pin){
   else { S.opin=""; S.pinErr=t("pinWrong"); }
   render();
 }
+async function askSend(){
+  const text=S.ai.text.trim(); if(!text||S.ai.busy) return;
+  S.ai.items.push({role:"user",text,at:Date.now()}); S.ai.text=""; S.ai.busy=true; S.ai.err=""; saveAi(); render();
+  const history=S.ai.items.filter(it=>!it.draft&&(it.role==="user"||it.role==="assistant")).map(it=>({role:it.role,text:it.text}));
+  try{
+    const r=await api("POST","/api/assist",{history,phone:S.lookup.phone,apt:S.lookup.apt,lang:S.lang});
+    S.ai.items.push({role:"assistant",text:r.reply,at:Date.now()});
+    if(r.draft) S.ai.items.push({role:"assistant",draft:r.draft,at:Date.now()});
+    if(r.handoff){ S.ai.handoffs.push({id:r.handoff.id,at:Date.now()-60000}); loadMine(); }
+  }catch(e){ S.ai.err=e.message||t("saveErr"); }
+  S.ai.busy=false; saveAi(); render();
+}
+async function draftSend(k){
+  const it=S.ai.items[k]; if(!it||!it.draft||it.sent||it.busy) return;
+  it.busy=true; render();
+  try{
+    const r=await api("POST","/api/requests",{building:(saved.building||"").trim(),apt:S.lookup.apt.trim(),phone:S.lookup.phone.trim(),name:(saved.name||"").trim(),category:it.draft.category,details:it.draft.details,timePref:it.draft.timePref,lang:S.lang});
+    it.sent=r.ticket; S.ai.items.push({role:"assistant",text:t("draftSentMsg")+" #"+r.ticket+".",at:Date.now()});
+    if(!saved.phone||!saved.apt){ saved=Object.assign({},saved,{phone:S.lookup.phone,apt:S.lookup.apt}); store.set("mzs-me",JSON.stringify(saved)); }
+    loadMine();
+  }catch(e){ S.ai.err=e.message||t("saveErr"); }
+  delete it.busy; saveAi(); render();
+}
 async function chatSend(id){
   const text=(S.chat[id]||"").trim(); if(!text) return;
   const office=S.view==="officeReq";
@@ -686,6 +767,12 @@ document.addEventListener("click",async ev=>{
   if(a==="otab"){ S.oTab=v; render(); return; }
   if(a==="openReq"){ S.oId=id; S.view="officeReq"; render(); window.scrollTo(0,0); loadOffice(); return; }
   if(a==="toOffice"){ S.view="office"; render(); window.scrollTo(0,0); return; }
+  if(a==="toAssist"){ S.view="assist"; S.ai.err=""; render(); window.scrollTo(0,0); if(S.lookup.phone&&S.lookup.apt) loadMine(); return; }
+  if(a==="askStart"){ S.lookup={phone:S.lookup.phone.trim(),apt:S.lookup.apt.trim()}; render(); loadMine(); return; }
+  if(a==="askSend"){ askSend(); return; }
+  if(a==="askReset"){ S.ai.items=[]; S.ai.handoffs=[]; S.ai.err=""; saveAi(); render(); return; }
+  if(a==="draftYes"){ draftSend(Number(v)); return; }
+  if(a==="draftNo"){ const it=S.ai.items[Number(v)]; if(it){ it.cancelled=true; saveAi(); render(); } return; }
   if(a==="chat"){ S.chatOpen[id]=!S.chatOpen[id]; render(); return; }
   if(a==="chatSend"){ chatSend(id); return; }
   if(a==="signOut"){ S.authed=false; S.pin=""; S.jobs=[]; S.fb=[]; store.del("mzs-pin"); S.view="pin"; render(); return; }
@@ -705,7 +792,7 @@ document.addEventListener("click",async ev=>{
   if(a==="done"){ const patch={status:"done",finishedAt:Date.now(),blockReason:null}; if(S.notes[id]!==undefined) patch.notes=S.notes[id]; if(S.writeups[id]!==undefined) patch.writeup=S.writeups[id];
     if(await upd(id,patch)){ delete S.notes[id]; delete S.writeups[id]; S.view="jobs"; render(); window.scrollTo(0,0);} return; }
   if(a==="block"){ if(await upd(id,{status:"blocked",blockReason:v})){ S.view="jobs"; render(); window.scrollTo(0,0);} return; }
-  if(a==="toFb"){ S.prevView=S.view; S.fbDraft.screen=({form:"tenantForm",sent:"tenantForm",mine:"tenantMine",jobs:"workerJobs",job:"workerJob",pin:"workerJobs"})[S.view]||"general"; S.fbErr=""; S.view="feedback"; render(); window.scrollTo(0,0); loadFb(); return; }
+  if(a==="toFb"){ S.prevView=S.view; S.fbDraft.screen=({form:"tenantForm",sent:"tenantForm",mine:"tenantMine",assist:"tenantMine",jobs:"workerJobs",job:"workerJob",pin:"workerJobs"})[S.view]||"general"; S.fbErr=""; S.view="feedback"; render(); window.scrollTo(0,0); loadFb(); return; }
   if(a==="fbBack"){ S.view=S.prevView||(S.role==="worker"?"jobs":S.role==="office"?"office":"form"); render(); window.scrollTo(0,0); return; }
   if(a==="fbKind"){ S.fbDraft.kind=v; render(); return; }
   if(a==="fbSend"){ const d=S.fbDraft; if(!d.text.trim()){ S.fbErr=t("fbNeed"); render(); return; }
@@ -720,6 +807,7 @@ document.addEventListener("input",ev=>{
   const el=ev.target;
   if(el.dataset.f){ S.draft[el.dataset.f]=el.value; return; }
   if(el.dataset.lk){ S.lookup[el.dataset.lk]=el.value; return; }
+  if(el.dataset.ai){ S.ai.text=el.value; return; }
   if(el.dataset.chat){ S.chat[el.dataset.chat]=el.value; return; }
   if(el.dataset.fb){ S.fbDraft.text=el.value; return; }
   if(el.dataset.notes){ S.notes[el.dataset.notes]=el.value; return; }
@@ -755,7 +843,7 @@ render();
     if(document.hidden) return;
     if(S.role==="worker"&&S.authed&&(S.view==="jobs"||S.view==="job")) loadJobs();
     else if(S.role==="office"&&S.oauthed&&(S.view==="office"||S.view==="officeReq")) loadOffice();
-    else if(S.view==="mine"&&S.lookup.phone&&S.lookup.apt) loadMine();
+    else if((S.view==="mine"||(S.view==="assist"&&S.ai.handoffs.length))&&S.lookup.phone&&S.lookup.apt) loadMine();
     else if(S.view==="feedback"&&S.authed) loadFb();
   },60000);
 })();
