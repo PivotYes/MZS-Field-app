@@ -291,7 +291,7 @@ const today=()=>ymd(new Date());
 const addDays=(day,n)=>{const d=new Date(day+"T12:00:00");d.setDate(d.getDate()+n);return ymd(d)};
 const fmtClock=hm=>{ if(!hm) return ""; const [h,m]=hm.split(":").map(Number); const d=new Date(2000,0,1,h,m); return d.toLocaleTimeString(loc(),{hour:"numeric",minute:"2-digit"}); };
 const toMin=hm=>{const [h,m]=String(hm||"0:0").split(":").map(Number);return h*60+(m||0)};
-const ARRIVE_WIN=120;
+const ARRIVE_WIN=60;
 const fmtWindow=v=>{ if(!v||!v.date) return ""; if(!v.start) return fmtVisit(v); const d=new Date(v.date+"T12:00:00");
   return d.toLocaleDateString(loc(),{weekday:"short",month:"short",day:"numeric"})+" · "+t("arriveWin")+" "+fmtClock(v.start)+" "+t("and")+" "+fmtClock(toHm(Math.min(toMin(v.start)+ARRIVE_WIN,23*60+59))); };
 const toHm=n=>String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");

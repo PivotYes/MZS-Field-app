@@ -39,7 +39,7 @@ Office > Schedule shows one lane per worker for the chosen day (7 AM to 7 PM).
 - Tap a request or visit (or "Set time") to type in the worker, date, start time, and length.
 - Every card shows the tenant's best time. While dragging, that part of the day lights up green. A visit outside it shows a warning.
 - While dragging, a dotted box shows exactly where and how long the visit will land.
-- Placing a request sets its status to Scheduled. Workers see the exact time. Tenants see a 2-hour arrival window ("Tech arrives between 9:30 AM and 11:30 AM"); change `ARRIVE_WIN` in index.html to adjust.
+- Placing a request sets its status to Scheduled. Workers see the exact time. Tenants see a 1-hour arrival window ("Tech arrives between 9:30 AM and 10:30 AM"); change `ARRIVE_WIN` in index.html to adjust.
 
 ## Office: New request
 Office > New request is the same form tenants use. Phone is optional here. The request lands in "Not scheduled yet" on the schedule. If a phone is entered, the tenant can see it under "My requests".
