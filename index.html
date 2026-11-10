@@ -36,6 +36,7 @@ header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var
 .brand{font-weight:700;font-size:18px;margin-right:auto}
 .seg{display:inline-flex;background:var(--soft);border-radius:999px;padding:3px}
 .seg button{border:0;background:transparent;color:var(--ink2);font:inherit;font-size:15px;font-weight:700;padding:8px 14px;border-radius:999px;min-height:40px;cursor:pointer}
+.seg.many{display:flex;flex-wrap:wrap;border-radius:16px}
 .seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.15)}
 h1{font-size:28px;margin:20px 0 4px}
 h2{font-size:20px;margin:24px 0 8px}
@@ -116,6 +117,7 @@ input[type=time]{width:100%;font:inherit;color:var(--ink);background:var(--card)
 .blk.urg{border-color:var(--urg);background:var(--urgSoft)}
 .blk b{display:block}
 .blk .warn{color:var(--urg);font-weight:700}
+.dropbox{position:absolute;left:4px;right:4px;border:2px dashed var(--blue);border-radius:8px;background:color-mix(in srgb,var(--blueSoft) 60%,transparent);pointer-events:none;z-index:2;font-size:12px;font-weight:700;color:var(--blue2);padding:2px 6px}
 .ghost{position:fixed;z-index:50;pointer-events:none;opacity:.95;box-shadow:0 8px 20px rgba(0,0,0,.25);margin:0;display:block}
 .ghost .grip,.ghost .btn{display:none}
 #ed{scroll-margin-top:90px}
@@ -186,7 +188,9 @@ const T = {
     noMsgs:"No messages yet.", reply:"Reply to tenant", chatClosed:"This request is finished. The tenant can message again if they reopen it.",
     oHome:"Office", oSched:"Schedule", unsched:"Not scheduled yet", noUnsched:"Everything is scheduled.", dragHint:"Drag a request onto a worker’s lane. Drag it back here to take it off. Or tap Set time.",
     setTime:"Set time", tenantBest:"Tenant’s best time", assignTo:"Worker", startAt:"Start time", length:"Length", saveTime:"Save", takeOff:"Take off schedule", cancel:"Cancel",
-    today:"Today", jobOne:"job", prevDay:"Previous day", nextDay:"Next day", outside:"Outside tenant’s best time", jobsOn:"jobs", assigned:"Worker", needTime:"Pick a worker and a start time.",
+    today:"Today", jobOne:"job",
+    oNew:"New request", oNewSub:"Send a request for a tenant. It goes on the schedule as “Not scheduled yet.”", oSent:"Request sent. Ticket", arriveWin:"Tech arrives between", and:"and",
+    allW:"All", tenantName:"Tenant name", noMine:"No open jobs for you.", pickMe:"Who are you?", unassigned:"Not assigned", prevDay:"Previous day", nextDay:"Next day", outside:"Outside tenant’s best time", jobsOn:"jobs", assigned:"Worker", needTime:"Pick a worker and a start time.",
     cat:{heat:"No heat / hot water",leak:"Leak / water",electric:"Electric / lights",appliance:"Appliance",door:"Door / lock / window",pests:"Pests",building:"Building / hallway",other:"Something else"}
   },
   es:{
@@ -238,7 +242,9 @@ const T = {
     noMsgs:"Todavía no hay mensajes.", reply:"Contestar al inquilino", chatClosed:"Esta solicitud está terminada. El inquilino puede escribir otra vez si la reabre.",
     oHome:"Oficina", oSched:"Horario", unsched:"Sin programar", noUnsched:"Todo está programado.", dragHint:"Arrastre una solicitud a la fila de un técnico. Arrástrela aquí para quitarla. O toque Poner hora.",
     setTime:"Poner hora", tenantBest:"Mejor hora del inquilino", assignTo:"Técnico", startAt:"Hora de inicio", length:"Duración", saveTime:"Guardar", takeOff:"Quitar del horario", cancel:"Cancelar",
-    today:"Hoy", jobOne:"trabajo", prevDay:"Día anterior", nextDay:"Día siguiente", outside:"Fuera de la mejor hora del inquilino", jobsOn:"trabajos", assigned:"Técnico", needTime:"Elija un técnico y una hora.",
+    today:"Hoy", jobOne:"trabajo",
+    oNew:"Nueva solicitud", oNewSub:"Envíe una solicitud por un inquilino. Aparece en el horario como “Sin programar.”", oSent:"Solicitud enviada. Ticket", arriveWin:"El técnico llega entre", and:"y",
+    allW:"Todos", tenantName:"Nombre del inquilino", noMine:"No tiene trabajos abiertos.", pickMe:"¿Quién es usted?", unassigned:"Sin asignar", prevDay:"Día anterior", nextDay:"Día siguiente", outside:"Fuera de la mejor hora del inquilino", jobsOn:"trabajos", assigned:"Técnico", needTime:"Elija un técnico y una hora.",
     cat:{heat:"Sin calefacción / agua caliente",leak:"Fuga / agua",electric:"Electricidad / luces",appliance:"Electrodoméstico",door:"Puerta / cerradura / ventana",pests:"Plagas",building:"Edificio / pasillo",other:"Otra cosa"}
   }
 };
@@ -261,7 +267,9 @@ const S={
   pin: store.get("mzs-pin")||"", authed:false, pinErr:"", pinBusy:false,
   opin: store.get("mzs-opin")||"", oauthed:false, office:[], oLoaded:false, oTab:"open", oId:null,
   chat:{}, chatOpen:{}, chatBusy:{}, chatErr:{},
-  calDate:"", ed:null, oErr:"",
+  calDate:"", ed:null, oErr:"", oMsg:"",
+  oDraft:{building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime"},
+  wMe: store.get("mzs-wme")||"",
   jobs:[], loaded:false, jobId:null, workerTab:"open",
   draft:{building:saved.building||"",apt:saved.apt||"",phone:saved.phone||"",name:saved.name||"",category:"",details:"",timePref:"anytime"},
   files:[], sending:false, formErr:"", lastTicket:"", fromWorker:false,
@@ -283,6 +291,9 @@ const today=()=>ymd(new Date());
 const addDays=(day,n)=>{const d=new Date(day+"T12:00:00");d.setDate(d.getDate()+n);return ymd(d)};
 const fmtClock=hm=>{ if(!hm) return ""; const [h,m]=hm.split(":").map(Number); const d=new Date(2000,0,1,h,m); return d.toLocaleTimeString(loc(),{hour:"numeric",minute:"2-digit"}); };
 const toMin=hm=>{const [h,m]=String(hm||"0:0").split(":").map(Number);return h*60+(m||0)};
+const ARRIVE_WIN=60;
+const fmtWindow=v=>{ if(!v||!v.date) return ""; if(!v.start) return fmtVisit(v); const d=new Date(v.date+"T12:00:00");
+  return d.toLocaleDateString(loc(),{weekday:"short",month:"short",day:"numeric"})+" · "+t("arriveWin")+" "+fmtClock(v.start)+" "+t("and")+" "+fmtClock(toHm(Math.min(toMin(v.start)+ARRIVE_WIN,23*60+59))); };
 const toHm=n=>String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");
 S.calDate=today();
 
@@ -391,20 +402,22 @@ function render(){
 }
 function chip(act,v,on,label){return `<button type="button" class="chip" data-act="${act}" data-v="${v}" aria-pressed="${on}">${esc(label)}</button>`}
 
+const inOffice=()=>S.view==="office"&&S.oTab==="new";
+const draft=()=>inOffice()?S.oDraft:S.draft;
 function vForm(){
-  const d=S.draft;
+  const d=draft(), off=inOffice();
   return `
   ${S.fromWorker?`<button class="link back" data-act="toJobs">${t("back")}</button>`:""}
-  <h1>${t("reportTitle")}</h1>
-  ${S.fromWorker?"":`<button class="link" data-act="toMine">${t("myReq")} ›</button>`}
-  <div class="alert">${t("emergency")}</div>
+  ${off?`<h2>${t("oNew")}</h2><p class="sub">${t("oNewSub")}</p>`:`<h1>${t("reportTitle")}</h1>`}
+  ${S.fromWorker||off?"":`<button class="link" data-act="toMine">${t("myReq")} ›</button>`}
+  ${off?"":`<div class="alert">${t("emergency")}</div>`}
   <label for="f-building">${t("building")}</label>
   <input id="f-building" type="text" data-f="building" value="${esc(d.building)}" autocomplete="street-address">
   <label for="f-apt">${t("apt")}</label>
   <input id="f-apt" type="text" data-f="apt" value="${esc(d.apt)}">
   <label for="f-phone">${t("phone")}</label>
   <input id="f-phone" type="tel" data-f="phone" value="${esc(d.phone)}" autocomplete="tel">
-  <label for="f-name">${t("yourName")}</label>
+  <label for="f-name">${off?t("tenantName"):t("yourName")}</label>
   <input id="f-name" type="text" data-f="name" value="${esc(d.name)}" autocomplete="name">
   <label id="l-cat">${t("whatsWrong")}</label>
   <div class="chips" role="group" aria-labelledby="l-cat">${CATS.map(c=>chip("cat",c,d.category===c,catName(c))).join("")}</div>
@@ -414,7 +427,7 @@ function vForm(){
   <label for="f-files">${t("photo")}</label>
   <input id="f-files" class="file" type="file" accept="image/*,video/*" multiple data-act="pickFiles">
   ${S.files.length?`<p class="small">${S.files.length} ✓</p>`:""}
-  <label id="l-time">${t("bestTime")}</label>
+  <label id="l-time">${off?t("tenantBest"):t("bestTime")}</label>
   <div class="chips three" role="group" aria-labelledby="l-time">${["morning","afternoon","anytime"].map(x=>chip("time",x,d.timePref===x,t(x))).join("")}</div>
   ${S.formErr?`<p class="err" role="alert">${esc(S.formErr)}</p>`:""}
   <div style="margin-top:20px"><button class="btn primary block" data-act="send" ${S.sending?"disabled":""}>${S.sending?t("sending"):t("send")}</button></div>`;
@@ -445,7 +458,7 @@ function vMine(){
     <p class="ttl">${esc(catName(j.category))}</p>
     <p class="meta">${t("ticket")} #${esc(j.ticket)} · ${j.status==="done"?t("fixedOn")+" "+fmtDate(j.finishedAt):t("sentOn")+" "+fmtDate(j.createdAt)}</p>
     ${j.status!=="done"?stepsHtml(j):""}
-    ${j.visit&&j.status!=="done"?`<p class="meta" style="margin-top:10px"><b>${t("visit")}:</b> ${esc(fmtVisit(j.visit))}</p>`:""}
+    ${j.visit&&j.status!=="done"?`<p class="meta" style="margin-top:10px"><b>${t("visit")}:</b> ${esc(fmtWindow(j.visit))}</p>`:""}
     ${j.status==="done"&&j.afterPhotos&&j.afterPhotos.length?`<div class="photos">${photoHtml(j.afterPhotos)}</div>`:""}
     ${j.status==="done"?`<div class="row"><button class="btn sm" data-act="reopen" data-id="${esc(j.id)}">${t("reopen")}</button></div>`:`
     <div class="row"><button class="btn sm" data-act="chat" data-id="${esc(j.id)}" aria-expanded="${!!S.chatOpen[j.id]}">${S.chatOpen[j.id]?t("hideMsgs"):t("msgUs")}${(j.messages||[]).length?` (${j.messages.length})`:""}</button></div>
@@ -504,12 +517,14 @@ function vOffice(){
     <div class="row"><button class="btn sm primary" data-act="openReq" data-id="${esc(j.id)}">${t("openReq")}</button></div></div>`; };
   return `<h1>${t("oHome")}</h1>
   <p class="sub">${waiting} ${t("needsReply").toLowerCase()} · <button class="link" style="padding:0;min-height:0" data-act="oSignOut">${t("signOut")}</button></p>
-  <div class="seg" role="group" aria-label="Requests">
+  <div class="seg many" role="group" aria-label="Requests">
     <button data-act="otab" data-v="open" aria-pressed="${S.oTab==="open"}">${t("oOpen")} (${open.length})</button>
     <button data-act="otab" data-v="done" aria-pressed="${S.oTab==="done"}">${t("oDone")} (${done.length})</button>
     <button data-act="otab" data-v="sched" aria-pressed="${S.oTab==="sched"}">${t("oSched")}</button>
+    <button data-act="otab" data-v="new" aria-pressed="${S.oTab==="new"}">${t("oNew")}</button>
   </div>
-  ${S.oTab==="sched"?vSchedule(open):!S.oLoaded?`<p class="empty">${t("loading")}</p>`:!list.length?`<p class="empty">${S.oTab==="open"?t("oNone"):t("oNoneDone")}</p>`:list.map(card).join("")}`;
+  ${S.oMsg?`<p class="note" role="status">${esc(S.oMsg)} ✓</p>`:""}
+  ${S.oTab==="new"?vForm():S.oTab==="sched"?vSchedule(open):!S.oLoaded?`<p class="empty">${t("loading")}</p>`:!list.length?`<p class="empty">${S.oTab==="open"?t("oNone"):t("oNoneDone")}</p>`:list.map(card).join("")}`;
 }
 /* ---------- office schedule: one lane per worker ---------- */
 const CAL_START=7, CAL_END=19, PXH=56, PXM=PXH/60, SNAP=15;
@@ -630,20 +645,27 @@ function moveDrag(ev){
     const cal=document.getElementById("cal"); if(cal&&j.timePref&&j.timePref!=="anytime") cal.dataset.hl=j.timePref;
     drag.el.style.opacity=".35";
   }
-  drag.ghost.style.transform=`translate(${ev.clientX-Math.min(drag.dx,40)}px,${ev.clientY-Math.min(drag.dy,20)}px)`;
+  // Card follows to the right of the pointer so the dotted drop box stays visible
+  drag.ghost.style.transform=`translate(${ev.clientX+24+drag.ghost.offsetWidth>innerWidth-8?Math.max(8,ev.clientX-24-drag.ghost.offsetWidth):ev.clientX+24}px,${ev.clientY+12}px)`;
   if(ev.clientY<60) window.scrollBy(0,-12); else if(ev.clientY>innerHeight-60) window.scrollBy(0,12);
   const under=document.elementFromPoint(ev.clientX,ev.clientY);
   const lane=under&&under.closest(".lane"), un=under&&under.closest("[data-drop=un]");
   document.querySelectorAll(".lane.over,.ulist.over").forEach(x=>x.classList.remove("over"));
+  document.querySelectorAll(".dropbox").forEach(x=>x.remove());
   drag.lane=null; drag.un=false; drag.start=null;
   const gt=drag.ghost.querySelector(".gt");
   if(lane){
     lane.classList.add("over");
-    const top=ev.clientY-Math.min(drag.dy,20)-lane.getBoundingClientRect().top;
+    const top=ev.clientY-lane.getBoundingClientRect().top-8;
     let m=CAL_START*60+Math.round(top/PXM/SNAP)*SNAP;
     m=Math.max(CAL_START*60,Math.min(CAL_END*60-SNAP,m));
     drag.lane=Number(lane.dataset.lane); drag.start=toHm(m);
     gt.textContent=S.cfg.workers[drag.lane]+" · "+fmtClock(drag.start);
+    const len=(S.office.find(x=>x.id===drag.id)||{}).mins||60;
+    const box=document.createElement("div"); box.className="dropbox";
+    box.style.top=(m-CAL_START*60)*PXM+"px"; box.style.height=Math.max(22,Math.min(len,CAL_END*60-m)*PXM-2)+"px";
+    box.textContent=fmtClock(drag.start)+"–"+fmtClock(toHm(m+len));
+    lane.appendChild(box);
   } else if(un){ un.classList.add("over"); drag.un=true; gt.textContent=t("takeOff"); }
   else gt.textContent="";
 }
@@ -652,6 +674,7 @@ async function endDrag(){
   const d=drag; drag=null;
   document.body.classList.remove("dragging");
   document.querySelectorAll(".lane.over,.ulist.over").forEach(x=>x.classList.remove("over"));
+  document.querySelectorAll(".dropbox").forEach(x=>x.remove());
   const cal=document.getElementById("cal"); if(cal) delete cal.dataset.hl;
   if(d.ghost) d.ghost.remove(); d.el.style.opacity="";
   if(!d.moved){ openEditor(d.id); return; }
@@ -696,24 +719,34 @@ function tagsFor(j){
   return h;
 }
 function mapUrl(j){return "https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(j.building||"")}
+const visitKey=j=>j.visit&&j.visit.date?j.visit.date+" "+(j.visit.start||(j.visit.slot==="afternoon"?"12:00":"08:00")):"9999";
 function vJobs(){
-  const open=S.jobs.filter(j=>j.status!=="done").sort((a,b)=>(b.urgent?1:0)-(a.urgent?1:0)||(RANK[a.status]??9)-(RANK[b.status]??9)||(a.createdAt||0)-(b.createdAt||0));
-  const done=S.jobs.filter(j=>j.status==="done").sort((a,b)=>(b.finishedAt||0)-(a.finishedAt||0));
+  const W=S.cfg.workers, me=W.includes(S.wMe)?S.wMe:"";
+  const mine=S.jobs.filter(j=>!me||j.worker===me);
+  const open=mine.filter(j=>j.status!=="done").sort(me
+    ?(a,b)=>visitKey(a).localeCompare(visitKey(b))||(b.urgent?1:0)-(a.urgent?1:0)
+    :(a,b)=>(b.urgent?1:0)-(a.urgent?1:0)||(RANK[a.status]??9)-(RANK[b.status]??9)||(a.createdAt||0)-(b.createdAt||0));
+  const done=mine.filter(j=>j.status==="done").sort((a,b)=>(b.finishedAt||0)-(a.finishedAt||0));
   const list=S.workerTab==="open"?open:done;
   const card=(j,i)=>`<div class="card">
     <div class="tags">${tagsFor(j)}</div>
     <p class="ttl">${S.workerTab==="open"?(i+1)+". ":""}${esc(catName(j.category))}</p>
     <p class="meta">${esc(j.building||"[Building address]")} · ${t("apt")} ${esc(j.apt)}</p>
-    ${j.visit&&j.status!=="done"?`<p class="meta">${t("visit")}: ${esc(fmtVisit(j.visit))}${j.worker?" · "+esc(j.worker):""}</p>`:j.timePref?`<p class="meta">${t("best")}: ${t(j.timePref)}</p>`:""}
+    ${j.visit&&j.status!=="done"?`<p class="meta">${t("visit")}: ${esc(fmtVisit(j.visit))}${me?"":" · "+esc(j.worker||t("unassigned"))}</p>`:j.timePref?`<p class="meta">${t("best")}: ${t(j.timePref)}</p>`:""}
     <div class="row">${j.building?`<a class="btn sm" href="${mapUrl(j)}" target="_blank" rel="noopener">${t("map")}</a>`:""}
     <button class="btn sm primary" data-act="openJob" data-id="${esc(j.id)}">${t("openJob")}</button></div></div>`;
-  return `<h1>${t("hi")}</h1>
+  const cnt=w=>S.jobs.filter(j=>j.status!=="done"&&(!w||j.worker===w)).length;
+  return `<h1>${t("hi")}${me?", "+esc(me):""}</h1>
   <p class="sub">${open.length} ${t("jobsToday")} · ${done.length} ${t("doneCount")} · <button class="link" style="padding:0;min-height:0" data-act="signOut">${t("signOut")}</button></p>
+  <div class="seg many" role="group" aria-label="${t("pickMe")}" style="margin-bottom:8px">
+    <button data-act="wme" data-v="" aria-pressed="${!me}">${t("allW")} (${cnt("")})</button>
+    ${W.map(w=>`<button data-act="wme" data-v="${esc(w)}" aria-pressed="${me===w}">${esc(w)} (${cnt(w)})</button>`).join("")}
+  </div>
   <div class="seg" role="group" aria-label="Jobs">
     <button data-act="wtab" data-v="open" aria-pressed="${S.workerTab==="open"}">${t("openTab")} (${open.length})</button>
     <button data-act="wtab" data-v="done" aria-pressed="${S.workerTab==="done"}">${t("doneTab")} (${done.length})</button>
   </div>
-  ${!S.loaded?`<p class="empty">${t("loading")}</p>`:!list.length?`<p class="empty">${S.workerTab==="open"?t("noJobs"):t("noDone")}</p>`:list.map(card).join("")}
+  ${!S.loaded?`<p class="empty">${t("loading")}</p>`:!list.length?`<p class="empty">${S.workerTab==="open"?(me?t("noMine"):t("noJobs")):t("noDone")}</p>`:list.map(card).join("")}
   <div style="margin-top:16px"><button class="btn block" data-act="flag">${t("flag")}</button></div>`;
 }
 function vJob(){
@@ -811,6 +844,7 @@ async function upd(id,patch){
 function flash(key){ S.flash[key]=1; render(); setTimeout(()=>{delete S.flash[key]; soft();},1800); }
 
 async function send(){
+  if(inOffice()) return sendOffice();
   const d=S.draft;
   if(!d.apt.trim()||!d.phone.trim()||!d.category){ S.formErr=t("needApt"); render(); return; }
   S.formErr=""; S.sending=true; render();
@@ -828,6 +862,22 @@ async function send(){
     if(S.fromWorker){ S.fromWorker=false; S.view="jobs"; await loadJobs(); }
     else S.view="sent";
     render(); window.scrollTo(0,0);
+  }catch(e){ S.sending=false; S.formErr=e.message||t("saveErr"); render(); }
+}
+// Office sends a request for a tenant, then sees it on the schedule
+async function sendOffice(){
+  const d=S.oDraft;
+  if(!d.apt.trim()||!d.category){ S.formErr=t("needApt"); render(); return; }
+  S.formErr=""; S.sending=true; render();
+  try{
+    const r=await api("POST","/api/requests",{building:d.building.trim(),apt:d.apt.trim(),phone:d.phone.trim(),name:d.name.trim(),category:d.category,details:d.details.trim(),timePref:d.timePref,lang:S.lang});
+    let note="";
+    if(S.files.length){ const u=await uploadFiles(r.id,"tenant",S.files); if(u.tooBig) note=t("tooBig"); else if(u.failed) note=t("uploadErr"); }
+    S.files=[]; S.sending=false;
+    S.oDraft={building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime"};
+    S.oMsg=t("oSent")+" #"+r.ticket+(note?" · "+note:""); S.oTab="sched";
+    await loadOffice(); render(); window.scrollTo(0,0);
+    setTimeout(()=>{ S.oMsg=""; soft(); },6000);
   }catch(e){ S.sending=false; S.formErr=e.message||t("saveErr"); render(); }
 }
 async function writeUp(id){
@@ -879,8 +929,8 @@ document.addEventListener("click",async ev=>{
   if(a==="pickFiles"||a==="jobPhoto") return;
   if(a==="role"){ S.role=v; store.set("mzs-role",v); S.fromWorker=false; if(v==="worker") goWorker(); else if(v==="office") goOffice(); else S.view="form"; render(); window.scrollTo(0,0); return; }
   if(a==="lang"){ S.lang=v; store.set("mzs-lang",v); render(); return; }
-  if(a==="cat"){ S.draft.category=v; render(); return; }
-  if(a==="time"){ S.draft.timePref=v; render(); return; }
+  if(a==="cat"){ draft().category=v; render(); return; }
+  if(a==="time"){ draft().timePref=v; render(); return; }
   if(a==="send"){ send(); return; }
   if(a==="toMine"){ S.view="mine"; render(); window.scrollTo(0,0); loadMine(); return; }
   if(a==="lookup"){ S.lookup={phone:S.lookup.phone.trim(),apt:S.lookup.apt.trim()}; loadMine(); render(); return; }
@@ -888,7 +938,7 @@ document.addEventListener("click",async ev=>{
   if(a==="toJobs"){ S.view="jobs"; S.fromWorker=false; render(); window.scrollTo(0,0); return; }
   if(a==="pinGo"){ const el=document.getElementById("p-pin"); const p=el?el.value.trim():""; if(p){ if(v==="office") tryOfficePin(p); else tryPin(p); } return; }
   if(a==="oSignOut"){ S.oauthed=false; S.opin=""; S.office=[]; store.del("mzs-opin"); S.view="opin"; render(); return; }
-  if(a==="otab"){ S.oTab=v; S.ed=null; render(); return; }
+  if(a==="otab"){ S.oTab=v; S.ed=null; S.formErr=""; render(); return; }
   if(a==="calDay"){ S.calDate=v==="0"?today():addDays(S.calDate,Number(v)); render(); return; }
   if(a==="edSched"){ openEditor(id); return; }
   if(a==="edCancel"){ S.ed=null; render(); return; }
@@ -905,6 +955,7 @@ document.addEventListener("click",async ev=>{
   if(a==="chatSend"){ chatSend(id); return; }
   if(a==="signOut"){ S.authed=false; S.pin=""; S.jobs=[]; S.fb=[]; store.del("mzs-pin"); S.view="pin"; render(); return; }
   if(a==="wtab"){ S.workerTab=v; render(); return; }
+  if(a==="wme"){ S.wMe=v; if(v) store.set("mzs-wme",v); else store.del("mzs-wme"); render(); return; }
   if(a==="openJob"){ S.jobId=id; S.view="job"; render(); window.scrollTo(0,0); return; }
   if(a==="flag"){ S.fromWorker=true; S.draft={building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime"}; S.view="form"; S.formErr=""; render(); window.scrollTo(0,0); return; }
   if(a==="reopen"){ try{ await api("POST","/api/my/"+id+"/reopen",{phone:S.lookup.phone,apt:S.lookup.apt}); }catch(e){ S.mineErr=e.message; } loadMine(); return; }
@@ -934,7 +985,7 @@ document.addEventListener("keydown",ev=>{ if((ev.key==="Enter"||ev.key===" ")&&e
   if(ev.key==="Enter"&&ev.target.dataset&&ev.target.dataset.pin){ const p=ev.target.value.trim(); if(p){ if(ev.target.dataset.pin==="office") tryOfficePin(p); else tryPin(p); } } });
 document.addEventListener("input",ev=>{
   const el=ev.target;
-  if(el.dataset.f){ S.draft[el.dataset.f]=el.value; return; }
+  if(el.dataset.f){ draft()[el.dataset.f]=el.value; return; }
   if(el.dataset.lk){ S.lookup[el.dataset.lk]=el.value; return; }
   if(el.dataset.chat){ S.chat[el.dataset.chat]=el.value; return; }
   if(el.dataset.fb){ S.fbDraft.text=el.value; return; }

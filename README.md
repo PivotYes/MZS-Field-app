@@ -38,7 +38,14 @@ Office > Schedule shows one lane per worker for the chosen day (7 AM to 7 PM).
 - Drag a visit to another lane or time to move it. Drag it back to the list to take it off.
 - Tap a request or visit (or "Set time") to type in the worker, date, start time, and length.
 - Every card shows the tenant's best time. While dragging, that part of the day lights up green. A visit outside it shows a warning.
-- Placing a request sets its status to Scheduled. Tenants and workers see the exact time.
+- While dragging, a dotted box shows exactly where and how long the visit will land.
+- Placing a request sets its status to Scheduled. Workers see the exact time. Tenants see a 1-hour arrival window ("Tech arrives between 9:30 AM and 10:30 AM"); change `ARRIVE_WIN` in index.html to adjust.
+
+## Office: New request
+Office > New request is the same form tenants use. Phone is optional here. The request lands in "Not scheduled yet" on the schedule. If a phone is entered, the tenant can see it under "My requests".
+
+## Worker tabs
+Worker side has a tab for All plus one per worker (names from `WORKERS`). A worker's tab shows only jobs assigned to them, in visit order. The phone remembers the last tab picked.
 
 Tenants can message on open and reopened requests, not finished ones. Workers never see messages.
 Workers can open the app's Worker side to see a warning if any field is missing.
