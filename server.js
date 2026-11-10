@@ -304,8 +304,8 @@ async function api(req, res, url) {
   if (m === "POST" && p === "/api/requests") {
     limit(req, 40);
     const b = await readBody(req, 50 * 1024);
-    const worker = pinOk(req);
-    if (!str(b.apt).trim() || !digits(b.phone) && !worker || !CAT[b.category]) throw bad("Apartment, phone, and problem are required");
+    const worker = pinOk(req), office = officeOk(req);
+    if (!str(b.apt).trim() || !digits(b.phone) && !worker && !office || !CAT[b.category]) throw bad("Apartment, phone, and problem are required");
     const F = jobFields({ building: b.building, apt: b.apt, phone: b.phone, name: b.name, category: b.category, details: b.details, timePref: b.timePref || "anytime", lang: b.lang === "es" ? "es" : "en", status: "received" });
     F["Ticket #"] = ticket();
     F["Urgent"] = b.category === "heat" || b.category === "leak";
@@ -321,7 +321,7 @@ async function api(req, res, url) {
     const id = r[1]; if (!isRec(id)) throw bad("Bad id");
     const b = await readBody(req, 8 * 1024 * 1024);
     const field = PHOTO_FIELD[b.field]; if (!field) throw bad("Bad photo field");
-    const worker = pinOk(req);
+    const worker = pinOk(req) || officeOk(req);
     if (!worker) {
       if (b.field !== "tenant") needPin(req);
       const rec = await getRec(id);
