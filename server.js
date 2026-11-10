@@ -6,6 +6,7 @@
 //   OFFICE_PIN         (required for tenant messages) code the office types to open the Office side
 //   ANTHROPIC_API_KEY  (optional) turns on the "Write it up for the office" button
 //   ANTHROPIC_MODEL    (optional) defaults to claude-haiku-5-5
+//   WORKERS            (optional) lane names on the office schedule, comma separated. Default "Worker 1,Worker 2,Worker 3"
 "use strict";
 const http = require("http");
 const fs = require("fs");
@@ -19,6 +20,7 @@ const PIN = process.env.WORKER_PIN || "";
 const OFFICE_PIN = process.env.OFFICE_PIN || "";
 const AI_KEY = process.env.ANTHROPIC_API_KEY || "";
 const AI_MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
+const WORKERS = String(process.env.WORKERS || "Worker 1,Worker 2,Worker 3").split(",").map(s => s.trim()).filter(Boolean).slice(0, 8);
 
 const REQ_TABLE = "Requests";
 const FB_TABLE = "Feedback";
@@ -34,7 +36,7 @@ const SCREEN = { general: "General / whole app", tenantForm: "Tenant: Report a p
 const FROM = { tenant: "Tenant", office: "Office" };
 const KIND = { bug: "Something's broken", change: "Change this", idea: "New idea", missing: "Something's missing" };
 
-const REQ_FIELDS = ["Ticket #","Status","Urgent","Problem type","Building address","Apartment","Tenant name","Tenant phone","Tenant description","Best time","Tenant photos","Visit date","Visit time","Started at","Finished at","Before photos","After photos","Worker notes","Office write-up","On-hold reason","Reopened","Flagged by worker","Tenant language","Created at","Last updated"];
+const REQ_FIELDS = ["Ticket #","Status","Urgent","Problem type","Building address","Apartment","Tenant name","Tenant phone","Tenant description","Best time","Tenant photos","Visit date","Visit time","Visit start","Visit length","Assigned to","Started at","Finished at","Before photos","After photos","Worker notes","Office write-up","On-hold reason","Reopened","Flagged by worker","Tenant language","Created at","Last updated"];
 const FB_FIELDS = ["Feedback","Screen","Type","Handled","Created at"];
 const MSG_FIELDS = ["Request","From","Message","Created at"];
 const PHOTO_FIELD = { tenant: "Tenant photos", before: "Before photos", after: "After photos" };
@@ -107,7 +109,9 @@ function jobOut(rec) {
     details: f["Tenant description"] || "",
     timePref: codeOf(TIME, f["Best time"]) || "anytime",
     photos: att(f["Tenant photos"]),
-    visit: f["Visit date"] ? { date: f["Visit date"], slot: codeOf(TIME, f["Visit time"]) || "anytime" } : null,
+    visit: f["Visit date"] ? { date: f["Visit date"], slot: codeOf(TIME, f["Visit time"]) || "anytime", start: f["Visit start"] || "" } : null,
+    worker: f["Assigned to"] || "",
+    mins: Number(f["Visit length"]) || 60,
     startedAt: ms(f["Started at"]),
     finishedAt: ms(f["Finished at"]),
     beforePhotos: att(f["Before photos"]),
@@ -155,13 +159,23 @@ function jobFields(p) {
   if (has("details")) F["Tenant description"] = str(p.details, 5000);
   if (has("timePref")) F["Best time"] = opt(REQ_TABLE, "Best time", pick(TIME, p.timePref, "best time"));
   if (has("visit")) {
-    if (!p.visit) { F["Visit date"] = null; F["Visit time"] = null; }
+    if (!p.visit) { F["Visit date"] = null; F["Visit time"] = null; F["Visit start"] = null; }
     else {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(p.visit.date || ""))) throw bad("Bad visit date");
       F["Visit date"] = p.visit.date;
       F["Visit time"] = opt(REQ_TABLE, "Visit time", pick(TIME, p.visit.slot || "anytime", "visit time"));
+      if (Object.prototype.hasOwnProperty.call(p.visit, "start")) {
+        const st = String(p.visit.start || "");
+        if (st && !/^([01]\d|2[0-3]):[0-5]\d$/.test(st)) throw bad("Bad start time");
+        F["Visit start"] = st || null;
+      }
     }
   }
+  if (has("worker")) {
+    if (p.worker && !WORKERS.includes(p.worker)) throw bad("Unknown worker");
+    F["Assigned to"] = p.worker || null;
+  }
+  if (has("mins")) F["Visit length"] = Math.min(600, Math.max(15, Math.round(Number(p.mins) || 60)));
   for (const [k, name] of [["startedAt", "Started at"], ["finishedAt", "Finished at"]]) {
     if (has(k)) F[name] = p[k] ? new Date(Number(p[k])).toISOString() : null;
   }
@@ -278,7 +292,7 @@ async function api(req, res, url) {
   const p = url.pathname, m = req.method;
   let r;
 
-  if (m === "GET" && p === "/api/config") return send(res, 200, { writeup: !!AI_KEY, pinSet: !!PIN, officeSet: !!OFFICE_PIN });
+  if (m === "GET" && p === "/api/config") return send(res, 200, { writeup: !!AI_KEY, pinSet: !!PIN, officeSet: !!OFFICE_PIN, workers: WORKERS });
 
   if (m === "GET" && p === "/api/health") {
     if (!officeOk(req)) needPin(req);
@@ -367,6 +381,27 @@ async function api(req, res, url) {
     const text = msgText(b);
     if (jobOut(await getRec(id)).status === "done") throw bad("This request is finished. The tenant can't see new messages.");
     return send(res, 200, { messages: await addMsg(id, "office", text) });
+  }
+
+  // Office puts a request on a worker's lane at a time, or takes it off the schedule
+  if (m === "PATCH" && (r = p.match(/^\/api\/office\/(rec\w+)\/schedule$/))) {
+    needOffice(req);
+    const id = r[1]; if (!isRec(id)) throw bad("Bad id");
+    const b = await readBody(req, 4 * 1024);
+    const cur = jobOut(await getRec(id));
+    if (cur.status === "done") throw bad("This request is finished.");
+    let patch;
+    if (b.clear) {
+      patch = { worker: "", visit: null };
+      if (cur.status === "scheduled") patch.status = "received";
+    } else {
+      const start = String(b.start || "");
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)) throw bad("Pick a start time");
+      if (!WORKERS.includes(b.worker)) throw bad("Pick a worker");
+      patch = { worker: b.worker, mins: b.mins || 60, visit: { date: b.date, slot: start < "12:00" ? "morning" : "afternoon", start } };
+      if (cur.status === "received" || cur.status === "blocked") { patch.status = "scheduled"; patch.blockReason = null; }
+    }
+    return send(res, 200, jobOut(await patchRec(id, jobFields(patch))));
   }
 
   // Worker: all jobs
