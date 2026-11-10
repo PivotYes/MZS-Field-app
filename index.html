@@ -646,7 +646,7 @@ function moveDrag(ev){
     drag.el.style.opacity=".35";
   }
   // Card follows to the right of the pointer so the dotted drop box stays visible
-  drag.ghost.style.transform=`translate(${Math.min(ev.clientX+24,innerWidth-drag.ghost.offsetWidth-8)}px,${ev.clientY+12}px)`;
+  drag.ghost.style.transform=`translate(${ev.clientX+24+drag.ghost.offsetWidth>innerWidth-8?Math.max(8,ev.clientX-24-drag.ghost.offsetWidth):ev.clientX+24}px,${ev.clientY+12}px)`;
   if(ev.clientY<60) window.scrollBy(0,-12); else if(ev.clientY>innerHeight-60) window.scrollBy(0,12);
   const under=document.elementFromPoint(ev.clientX,ev.clientY);
   const lane=under&&under.closest(".lane"), un=under&&under.closest("[data-drop=un]");
