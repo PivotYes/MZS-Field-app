@@ -190,7 +190,8 @@ const T = {
     setTime:"Set time", tenantBest:"Tenant’s best time", assignTo:"Worker", startAt:"Start time", length:"Length", saveTime:"Save", takeOff:"Take off schedule", cancel:"Cancel",
     today:"Today", jobOne:"job",
     oNew:"New request", oNewSub:"Send a request for a tenant. It goes on the schedule as “Not scheduled yet.”", oSent:"Request sent. Ticket", arriveWin:"Tech arrives between", and:"and",
-    allW:"All", tenantName:"Tenant name", noMine:"No open jobs for you.", pickMe:"Who are you?", unassigned:"Not assigned", prevDay:"Previous day", nextDay:"Next day", outside:"Outside tenant’s best time", jobsOn:"jobs", assigned:"Worker", needTime:"Pick a worker and a start time.",
+    allW:"All", tenantName:"Tenant name", priority:"Priority", priHint:"How soon does this need fixing?",
+    p_urgent:"Urgent", p_high:"High", p_medium:"Medium", p_low:"Low", schedFor:"Scheduled", notSched:"Not scheduled yet", newReqBtn:"+ New request", oNewBar:"Taking a call? Send a request for a tenant.", noMine:"No open jobs for you.", pickMe:"Who are you?", unassigned:"Not assigned", prevDay:"Previous day", nextDay:"Next day", outside:"Outside tenant’s best time", jobsOn:"jobs", assigned:"Worker", needTime:"Pick a worker and a start time.",
     cat:{heat:"No heat / hot water",leak:"Leak / water",electric:"Electric / lights",appliance:"Appliance",door:"Door / lock / window",pests:"Pests",building:"Building / hallway",other:"Something else"}
   },
   es:{
@@ -244,10 +245,14 @@ const T = {
     setTime:"Poner hora", tenantBest:"Mejor hora del inquilino", assignTo:"Técnico", startAt:"Hora de inicio", length:"Duración", saveTime:"Guardar", takeOff:"Quitar del horario", cancel:"Cancelar",
     today:"Hoy", jobOne:"trabajo",
     oNew:"Nueva solicitud", oNewSub:"Envíe una solicitud por un inquilino. Aparece en el horario como “Sin programar.”", oSent:"Solicitud enviada. Ticket", arriveWin:"El técnico llega entre", and:"y",
-    allW:"Todos", tenantName:"Nombre del inquilino", noMine:"No tiene trabajos abiertos.", pickMe:"¿Quién es usted?", unassigned:"Sin asignar", prevDay:"Día anterior", nextDay:"Día siguiente", outside:"Fuera de la mejor hora del inquilino", jobsOn:"trabajos", assigned:"Técnico", needTime:"Elija un técnico y una hora.",
+    allW:"Todos", tenantName:"Nombre del inquilino", priority:"Prioridad", priHint:"¿Qué tan pronto se necesita arreglar?",
+    p_urgent:"Urgente", p_high:"Alta", p_medium:"Media", p_low:"Baja", schedFor:"Programado", notSched:"Sin programar", newReqBtn:"+ Nueva solicitud", oNewBar:"¿Recibiendo una llamada? Envíe una solicitud por un inquilino.", noMine:"No tiene trabajos abiertos.", pickMe:"¿Quién es usted?", unassigned:"Sin asignar", prevDay:"Día anterior", nextDay:"Día siguiente", outside:"Fuera de la mejor hora del inquilino", jobsOn:"trabajos", assigned:"Técnico", needTime:"Elija un técnico y una hora.",
     cat:{heat:"Sin calefacción / agua caliente",leak:"Fuga / agua",electric:"Electricidad / luces",appliance:"Electrodoméstico",door:"Puerta / cerradura / ventana",pests:"Plagas",building:"Edificio / pasillo",other:"Otra cosa"}
   }
 };
+const PRIS=["urgent","high","medium","low"];
+const PRANK={urgent:0,high:1,medium:2,low:3};
+const priCmp=(a,b)=>(PRANK[a.priority]??2)-(PRANK[b.priority]??2);
 const CATS=["heat","leak","electric","appliance","door","pests","building","other"];
 const BLOCKS=["noAccess","needParts","needTrade","notHome","anotherDay"];
 const FB_SCREENS=["general","tenantForm","tenantMine","workerJobs","workerJob","airtable"];
@@ -265,13 +270,13 @@ const S={
   role: ["worker","office"].includes(store.get("mzs-role"))?store.get("mzs-role"):"tenant",
   view:"form", cfg:{writeup:false,pinSet:true,workers:["Worker 1","Worker 2","Worker 3"]}, health:null,
   pin: store.get("mzs-pin")||"", authed:false, pinErr:"", pinBusy:false,
-  opin: store.get("mzs-opin")||"", oauthed:false, office:[], oLoaded:false, oTab:"open", oId:null,
+  opin: store.get("mzs-opin")||"", oauthed:false, office:[], oLoaded:false, oTab:"sched", oId:null,
   chat:{}, chatOpen:{}, chatBusy:{}, chatErr:{},
   calDate:"", ed:null, oErr:"", oMsg:"",
-  oDraft:{building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime"},
+  oDraft:{building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime",priority:"medium",priTouched:false},
   wMe: store.get("mzs-wme")||"",
   jobs:[], loaded:false, jobId:null, workerTab:"open",
-  draft:{building:saved.building||"",apt:saved.apt||"",phone:saved.phone||"",name:saved.name||"",category:"",details:"",timePref:"anytime"},
+  draft:{building:saved.building||"",apt:saved.apt||"",phone:saved.phone||"",name:saved.name||"",category:"",details:"",timePref:"anytime",priority:"medium",priTouched:false},
   files:[], sending:false, formErr:"", lastTicket:"", fromWorker:false,
   lookup:{phone:saved.phone||"",apt:saved.apt||""}, mine:[], mineLoaded:false, mineErr:"", mineBusy:false,
   notes:{}, writeups:{}, sched:{}, busy:{}, flash:{}, err:{},
@@ -380,6 +385,7 @@ function header(){
 }
 function banners(){
   let h=S.view==="feedback"?"":`<div class="testbar"><span><b>${t("testing")}</b> ${t("testingSub")}</span><button class="btn sm primary" data-act="toFb">${t("giveFb")}</button></div>`;
+  if(S.role==="office"&&S.oauthed&&(S.view==="office"||S.view==="officeReq")) h+=`<div class="testbar" style="background:var(--okSoft)"><span>${t("oNewBar")}</span><button class="btn sm ok" data-act="oNewReq" ${S.view==="office"&&S.oTab==="new"?"disabled":""}>${t("newReqBtn")}</button></div>`;
   if((S.authed||S.oauthed)&&S.health&&S.health.missing&&S.health.missing.length) h+=`<div class="alert">${t("missingFields")} ${esc(S.health.missing.join(", "))}</div>`;
   return h;
 }
@@ -421,6 +427,9 @@ function vForm(){
   <input id="f-name" type="text" data-f="name" value="${esc(d.name)}" autocomplete="name">
   <label id="l-cat">${t("whatsWrong")}</label>
   <div class="chips" role="group" aria-labelledby="l-cat">${CATS.map(c=>chip("cat",c,d.category===c,catName(c))).join("")}</div>
+  <label for="f-pri">${t("priority")}</label>
+  <p class="small" style="margin:0 0 6px">${t("priHint")}</p>
+  <select id="f-pri" data-f="priority">${PRIS.map(p=>`<option value="${p}" ${d.priority===p?"selected":""}>${t("p_"+p)}</option>`).join("")}</select>
   <label for="f-details">${t("tellMore")}</label>
   <p class="small" style="margin:0 0 6px">${t("tellMoreHint")}</p>
   <textarea id="f-details" data-f="details">${esc(d.details)}</textarea>
@@ -506,23 +515,24 @@ const lastMsg=j=>(j.messages||[])[(j.messages||[]).length-1];
 const needsReply=j=>j.status!=="done"&&lastMsg(j)&&lastMsg(j).from==="tenant";
 function vOffice(){
   const recent=j=>(lastMsg(j)&&lastMsg(j).at)||j.createdAt||0;
-  const open=S.office.filter(j=>j.status!=="done").sort((a,b)=>(needsReply(b)?1:0)-(needsReply(a)?1:0)||recent(b)-recent(a));
+  const open=S.office.filter(j=>j.status!=="done").sort((a,b)=>(needsReply(b)?1:0)-(needsReply(a)?1:0)||priCmp(a,b)||recent(b)-recent(a));
   const done=S.office.filter(j=>j.status==="done").sort((a,b)=>recent(b)-recent(a));
   const list=S.oTab==="open"?open:done, waiting=open.filter(needsReply).length;
   const card=j=>{ const m=lastMsg(j); return `<div class="card">
     <div class="tags">${needsReply(j)?`<span class="tag urg">${t("needsReply")}</span>`:""}${tagsFor(j)}</div>
     <p class="ttl">${esc(catName(j.category))}</p>
     <p class="meta">${esc(j.building||"[Building address]")} · ${t("apt")} ${esc(j.apt)} · ${t("ticket")} #${esc(j.ticket)}</p>
+    ${j.status!=="done"?(j.visit&&j.visit.date?`<p class="meta"><b>${t("schedFor")}:</b> ${esc(fmtVisit(j.visit))}${j.worker?" · "+esc(j.worker):""}</p>`:`<p class="meta" style="color:var(--urg);font-weight:700">${t("notSched")}</p>`):""}
     ${m?`<p class="meta" style="margin-top:6px"><b>${esc(m.from==="office"?t("officeName"):(j.name||t("tenant")))}:</b> ${esc(m.text.length>120?m.text.slice(0,120)+"…":m.text)}</p>`:""}
     <div class="row"><button class="btn sm primary" data-act="openReq" data-id="${esc(j.id)}">${t("openReq")}</button></div></div>`; };
   return `<h1>${t("oHome")}</h1>
   <p class="sub">${waiting} ${t("needsReply").toLowerCase()} · <button class="link" style="padding:0;min-height:0" data-act="oSignOut">${t("signOut")}</button></p>
   <div class="seg many" role="group" aria-label="Requests">
+    <button data-act="otab" data-v="sched" aria-pressed="${S.oTab==="sched"}">${t("oSched")}</button>
     <button data-act="otab" data-v="open" aria-pressed="${S.oTab==="open"}">${t("oOpen")} (${open.length})</button>
     <button data-act="otab" data-v="done" aria-pressed="${S.oTab==="done"}">${t("oDone")} (${done.length})</button>
-    <button data-act="otab" data-v="sched" aria-pressed="${S.oTab==="sched"}">${t("oSched")}</button>
-    <button data-act="otab" data-v="new" aria-pressed="${S.oTab==="new"}">${t("oNew")}</button>
   </div>
+  ${S.oTab==="new"?`<button class="link back" data-act="otab" data-v="sched">‹ ${t("oSched")}</button>`:""}
   ${S.oMsg?`<p class="note" role="status">${esc(S.oMsg)} ✓</p>`:""}
   ${S.oTab==="new"?vForm():S.oTab==="sched"?vSchedule(open):!S.oLoaded?`<p class="empty">${t("loading")}</p>`:!list.length?`<p class="empty">${S.oTab==="open"?t("oNone"):t("oNoneDone")}</p>`:list.map(card).join("")}`;
 }
@@ -535,14 +545,14 @@ const fitsBest=j=>{ if(!j.visit||!j.visit.start||!j.timePref||j.timePref==="anyt
 function fmtLen(n){ return n%60?(n>=60?Math.floor(n/60)+"h ":"")+(n%60)+"m":(n/60)+"h"; }
 function vSchedule(open){
   const W=S.cfg.workers;
-  const un=open.filter(j=>!isPlaced(j)).sort((a,b)=>(b.urgent?1:0)-(a.urgent?1:0)||(a.createdAt||0)-(b.createdAt||0));
+  const un=open.filter(j=>!isPlaced(j)).sort((a,b)=>priCmp(a,b)||(a.createdAt||0)-(b.createdAt||0));
   const day=open.filter(j=>isPlaced(j)&&j.visit.date===S.calDate);
   const H=(CAL_END-CAL_START)*PXH, mBand=(12-CAL_START)*PXH;
   const d=new Date(S.calDate+"T12:00:00");
   const ucard=j=>`<div class="ucard" data-drag="${esc(j.id)}">
       <span class="grip" aria-hidden="true">⠿</span>
       <div class="grow">
-        <div class="tags">${j.urgent?`<span class="tag urg">${t("urgent")}</span>`:""}<span class="best">${t("tenantBest")}: ${esc(bestTxt(j))}</span></div>
+        <div class="tags">${tagsFor(j)}<span class="best">${t("tenantBest")}: ${esc(bestTxt(j))}</span></div>
         <p class="ttl" style="font-size:16px">${esc(catName(j.category))}</p>
         <p class="meta" style="font-size:14px">${esc(j.building||"[Building address]")} · ${t("apt")} ${esc(j.apt)}</p>
         ${j.visit&&j.visit.date?`<p class="meta" style="font-size:14px">${t("visit")}: ${esc(fmtVisit(j.visit))}</p>`:""}
@@ -710,7 +720,10 @@ function vOfficeReq(){
 const RANK={in_progress:0,scheduled:1,received:2,blocked:3};
 function tagsFor(j){
   let h="";
-  if(j.urgent) h+=`<span class="tag urg">${t("urgent")}</span>`;
+  if(j.priority==="urgent"||(!j.priority&&j.urgent)) h+=`<span class="tag urg">${t("urgent")}</span>`;
+  else if(j.priority==="high") h+=`<span class="tag urg">${t("p_high").toUpperCase()}</span>`;
+  else if(j.priority==="low") h+=`<span class="tag">${t("p_low").toUpperCase()}</span>`;
+  else if(j.priority==="medium") h+=`<span class="tag">${t("p_medium").toUpperCase()}</span>`;
   if(j.status==="in_progress") h+=`<span class="tag blue">${t("inProgress")}</span>`;
   else if(j.status==="scheduled") h+=`<span class="tag blue">${t("sched")}</span>`;
   else if(j.status==="received") h+=`<span class="tag">${t("newT")}</span>`;
@@ -724,8 +737,8 @@ function vJobs(){
   const W=S.cfg.workers, me=W.includes(S.wMe)?S.wMe:"";
   const mine=S.jobs.filter(j=>!me||j.worker===me);
   const open=mine.filter(j=>j.status!=="done").sort(me
-    ?(a,b)=>visitKey(a).localeCompare(visitKey(b))||(b.urgent?1:0)-(a.urgent?1:0)
-    :(a,b)=>(b.urgent?1:0)-(a.urgent?1:0)||(RANK[a.status]??9)-(RANK[b.status]??9)||(a.createdAt||0)-(b.createdAt||0));
+    ?(a,b)=>visitKey(a).localeCompare(visitKey(b))||priCmp(a,b)
+    :(a,b)=>priCmp(a,b)||(RANK[a.status]??9)-(RANK[b.status]??9)||(a.createdAt||0)-(b.createdAt||0));
   const done=mine.filter(j=>j.status==="done").sort((a,b)=>(b.finishedAt||0)-(a.finishedAt||0));
   const list=S.workerTab==="open"?open:done;
   const card=(j,i)=>`<div class="card">
@@ -849,7 +862,7 @@ async function send(){
   if(!d.apt.trim()||!d.phone.trim()||!d.category){ S.formErr=t("needApt"); render(); return; }
   S.formErr=""; S.sending=true; render();
   try{
-    const r=await api("POST","/api/requests",{building:d.building.trim(),apt:d.apt.trim(),phone:d.phone.trim(),name:d.name.trim(),category:d.category,details:d.details.trim(),timePref:d.timePref,lang:S.lang,byWorker:!!S.fromWorker});
+    const r=await api("POST","/api/requests",{building:d.building.trim(),apt:d.apt.trim(),phone:d.phone.trim(),name:d.name.trim(),category:d.category,details:d.details.trim(),timePref:d.timePref,priority:d.priority,lang:S.lang,byWorker:!!S.fromWorker});
     let note="";
     if(S.files.length){ const u=await uploadFiles(r.id,"tenant",S.files); if(u.tooBig) note=t("tooBig"); else if(u.failed) note=t("uploadErr"); }
     if(!S.fromWorker){
@@ -857,7 +870,7 @@ async function send(){
       S.lookup={phone:d.phone,apt:d.apt};
     }
     S.lastTicket=r.ticket; S.files=[];
-    S.draft=Object.assign({category:"",details:"",timePref:"anytime"},S.fromWorker?{building:"",apt:"",phone:"",name:""}:saved);
+    S.draft=Object.assign({category:"",details:"",timePref:"anytime",priority:"medium",priTouched:false},S.fromWorker?{building:"",apt:"",phone:"",name:""}:saved);
     S.sending=false; S.formErr=note;
     if(S.fromWorker){ S.fromWorker=false; S.view="jobs"; await loadJobs(); }
     else S.view="sent";
@@ -870,11 +883,11 @@ async function sendOffice(){
   if(!d.apt.trim()||!d.category){ S.formErr=t("needApt"); render(); return; }
   S.formErr=""; S.sending=true; render();
   try{
-    const r=await api("POST","/api/requests",{building:d.building.trim(),apt:d.apt.trim(),phone:d.phone.trim(),name:d.name.trim(),category:d.category,details:d.details.trim(),timePref:d.timePref,lang:S.lang});
+    const r=await api("POST","/api/requests",{building:d.building.trim(),apt:d.apt.trim(),phone:d.phone.trim(),name:d.name.trim(),category:d.category,details:d.details.trim(),timePref:d.timePref,priority:d.priority,lang:S.lang});
     let note="";
     if(S.files.length){ const u=await uploadFiles(r.id,"tenant",S.files); if(u.tooBig) note=t("tooBig"); else if(u.failed) note=t("uploadErr"); }
     S.files=[]; S.sending=false;
-    S.oDraft={building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime"};
+    S.oDraft={building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime",priority:"medium",priTouched:false};
     S.oMsg=t("oSent")+" #"+r.ticket+(note?" · "+note:""); S.oTab="sched";
     await loadOffice(); render(); window.scrollTo(0,0);
     setTimeout(()=>{ S.oMsg=""; soft(); },6000);
@@ -929,7 +942,7 @@ document.addEventListener("click",async ev=>{
   if(a==="pickFiles"||a==="jobPhoto") return;
   if(a==="role"){ S.role=v; store.set("mzs-role",v); S.fromWorker=false; if(v==="worker") goWorker(); else if(v==="office") goOffice(); else S.view="form"; render(); window.scrollTo(0,0); return; }
   if(a==="lang"){ S.lang=v; store.set("mzs-lang",v); render(); return; }
-  if(a==="cat"){ draft().category=v; render(); return; }
+  if(a==="cat"){ const d=draft(); d.category=v; if(!d.priTouched) d.priority=(v==="heat"||v==="leak")?"urgent":"medium"; render(); return; }
   if(a==="time"){ draft().timePref=v; render(); return; }
   if(a==="send"){ send(); return; }
   if(a==="toMine"){ S.view="mine"; render(); window.scrollTo(0,0); loadMine(); return; }
@@ -950,6 +963,7 @@ document.addEventListener("click",async ev=>{
     render(); return; }
   if(a==="edClear"){ const e=S.ed; if(!e) return; e.busy=true; render(); const ok=await placeJob(e.id,{clear:true}); if(ok) S.ed=null; else if(S.ed) S.ed.busy=false; render(); return; }
   if(a==="openReq"){ S.oId=id; S.view="officeReq"; render(); window.scrollTo(0,0); loadOffice(); return; }
+  if(a==="oNewReq"){ S.view="office"; S.oTab="new"; S.ed=null; S.formErr=""; render(); window.scrollTo(0,0); return; }
   if(a==="toOffice"){ S.view="office"; render(); window.scrollTo(0,0); return; }
   if(a==="chat"){ S.chatOpen[id]=!S.chatOpen[id]; render(); return; }
   if(a==="chatSend"){ chatSend(id); return; }
@@ -957,7 +971,7 @@ document.addEventListener("click",async ev=>{
   if(a==="wtab"){ S.workerTab=v; render(); return; }
   if(a==="wme"){ S.wMe=v; if(v) store.set("mzs-wme",v); else store.del("mzs-wme"); render(); return; }
   if(a==="openJob"){ S.jobId=id; S.view="job"; render(); window.scrollTo(0,0); return; }
-  if(a==="flag"){ S.fromWorker=true; S.draft={building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime"}; S.view="form"; S.formErr=""; render(); window.scrollTo(0,0); return; }
+  if(a==="flag"){ S.fromWorker=true; S.draft={building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime",priority:"medium",priTouched:false}; S.view="form"; S.formErr=""; render(); window.scrollTo(0,0); return; }
   if(a==="reopen"){ try{ await api("POST","/api/my/"+id+"/reopen",{phone:S.lookup.phone,apt:S.lookup.apt}); }catch(e){ S.mineErr=e.message; } loadMine(); return; }
   if(a==="urgent"){ const j=S.jobs.find(x=>x.id===id); if(j) await upd(id,{urgent:!j.urgent}); return; }
   if(a==="saveSched"){ const j=S.jobs.find(x=>x.id===id); if(!j) return;
@@ -985,7 +999,7 @@ document.addEventListener("keydown",ev=>{ if((ev.key==="Enter"||ev.key===" ")&&e
   if(ev.key==="Enter"&&ev.target.dataset&&ev.target.dataset.pin){ const p=ev.target.value.trim(); if(p){ if(ev.target.dataset.pin==="office") tryOfficePin(p); else tryPin(p); } } });
 document.addEventListener("input",ev=>{
   const el=ev.target;
-  if(el.dataset.f){ draft()[el.dataset.f]=el.value; return; }
+  if(el.dataset.f){ const d=draft(); d[el.dataset.f]=el.value; if(el.dataset.f==="priority") d.priTouched=true; return; }
   if(el.dataset.lk){ S.lookup[el.dataset.lk]=el.value; return; }
   if(el.dataset.chat){ S.chat[el.dataset.chat]=el.value; return; }
   if(el.dataset.fb){ S.fbDraft.text=el.value; return; }

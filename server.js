@@ -29,6 +29,7 @@ const MSG_TABLE = "Messages";
 /* ---------- value maps: app code <-> Airtable option ---------- */
 const STATUS = { received: "Received", scheduled: "Scheduled", in_progress: "In progress", blocked: "On hold", done: "Done" };
 const CAT = { heat: "No heat / hot water", leak: "Leak / water", electric: "Electric / lights", appliance: "Appliance", door: "Door / lock / window", pests: "Pests", building: "Building / hallway", other: "Something else" };
+const PRI = { urgent: "Urgent", high: "High", medium: "Medium", low: "Low" };
 const TIME = { morning: "Morning", afternoon: "Afternoon", anytime: "Anytime" };
 const BLOCK = { noAccess: "No access", needParts: "Need parts", needTrade: "Need another trade", notHome: "Tenant not home", anotherDay: "Need another day" };
 const LANG = { en: "English", es: "Spanish" };
@@ -36,7 +37,7 @@ const SCREEN = { general: "General / whole app", tenantForm: "Tenant: Report a p
 const FROM = { tenant: "Tenant", office: "Office" };
 const KIND = { bug: "Something's broken", change: "Change this", idea: "New idea", missing: "Something's missing" };
 
-const REQ_FIELDS = ["Ticket #","Status","Urgent","Problem type","Building address","Apartment","Tenant name","Tenant phone","Tenant description","Best time","Tenant photos","Visit date","Visit time","Visit start","Visit length","Assigned to","Started at","Finished at","Before photos","After photos","Worker notes","Office write-up","On-hold reason","Reopened","Flagged by worker","Tenant language","Created at","Last updated"];
+const REQ_FIELDS = ["Ticket #","Status","Urgent","Priority","Problem type","Building address","Apartment","Tenant name","Tenant phone","Tenant description","Best time","Tenant photos","Visit date","Visit time","Visit start","Visit length","Assigned to","Started at","Finished at","Before photos","After photos","Worker notes","Office write-up","On-hold reason","Reopened","Flagged by worker","Tenant language","Created at","Last updated"];
 const FB_FIELDS = ["Feedback","Screen","Type","Handled","Created at"];
 const MSG_FIELDS = ["Request","From","Message","Created at"];
 const PHOTO_FIELD = { tenant: "Tenant photos", before: "Before photos", after: "After photos" };
@@ -100,7 +101,8 @@ function jobOut(rec) {
     id: rec.id,
     ticket: f["Ticket #"] || "",
     status: codeOf(STATUS, f["Status"]) || "received",
-    urgent: !!f["Urgent"],
+    priority: codeOf(PRI, f["Priority"]) || (f["Urgent"] ? "urgent" : "medium"),
+    urgent: f["Priority"] ? codeOf(PRI, f["Priority"]) === "urgent" : !!f["Urgent"],
     category: codeOf(CAT, f["Problem type"]) || "other",
     building: f["Building address"] || "",
     apt: f["Apartment"] || "",
@@ -128,7 +130,7 @@ function jobOut(rec) {
 // What a tenant sees about their own request (no worker notes)
 function tenantOut(rec) {
   const j = jobOut(rec);
-  return { id: j.id, ticket: j.ticket, status: j.status, category: j.category, visit: j.visit, createdAt: j.createdAt, finishedAt: j.finishedAt, reopened: j.reopened, afterPhotos: j.afterPhotos, byWorker: j.byWorker };
+  return { id: j.id, ticket: j.ticket, status: j.status, priority: j.priority, category: j.category, visit: j.visit, createdAt: j.createdAt, finishedAt: j.finishedAt, reopened: j.reopened, afterPhotos: j.afterPhotos, byWorker: j.byWorker };
 }
 
 // Tenant <-> office messages. Workers never get these.
@@ -150,7 +152,9 @@ function pick(map, v, name, allowNull) {
 function jobFields(p) {
   const F = {}, has = k => Object.prototype.hasOwnProperty.call(p, k);
   if (has("status")) F["Status"] = opt(REQ_TABLE, "Status", pick(STATUS, p.status, "status"));
-  if (has("urgent")) F["Urgent"] = !!p.urgent;
+  // Priority and the Urgent checkbox stay in sync
+  if (has("priority")) { const pr = pick(PRI, p.priority, "priority"); F["Priority"] = opt(REQ_TABLE, "Priority", pr); F["Urgent"] = p.priority === "urgent"; }
+  else if (has("urgent")) { F["Urgent"] = !!p.urgent; F["Priority"] = opt(REQ_TABLE, "Priority", p.urgent ? PRI.urgent : PRI.medium); }
   if (has("category")) F["Problem type"] = opt(REQ_TABLE, "Problem type", pick(CAT, p.category, "problem type"));
   if (has("building")) F["Building address"] = str(p.building, 300);
   if (has("apt")) F["Apartment"] = str(p.apt, 40);
@@ -308,7 +312,7 @@ async function api(req, res, url) {
     if (!str(b.apt).trim() || !digits(b.phone) && !worker && !office || !CAT[b.category]) throw bad("Apartment, phone, and problem are required");
     const F = jobFields({ building: b.building, apt: b.apt, phone: b.phone, name: b.name, category: b.category, details: b.details, timePref: b.timePref || "anytime", lang: b.lang === "es" ? "es" : "en", status: "received" });
     F["Ticket #"] = ticket();
-    F["Urgent"] = b.category === "heat" || b.category === "leak";
+    Object.assign(F, jobFields({ priority: PRI[b.priority] ? b.priority : (b.category === "heat" || b.category === "leak" ? "urgent" : "medium") }));
     F["Flagged by worker"] = worker && !!b.byWorker;
     const rec = await at("POST", tablePath(REQ_TABLE), { fields: F, typecast: true });
     jobsCache = null;
