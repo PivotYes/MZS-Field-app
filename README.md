@@ -49,7 +49,7 @@ Office > Schedule shows one lane per worker for the chosen day (7 AM to 7 PM).
 The green "+ New request" bar stays at the top of every Office screen. It opens the same form tenants use. Phone is optional here. The request lands in "Not scheduled yet" on the schedule. If a phone is entered, the tenant can see it under "My requests".
 
 ## Worker tabs
-Worker side has a tab for All plus one per worker (names from `WORKERS`). A worker's tab shows only jobs assigned to them, in visit order. The phone remembers the last tab picked.
+Worker side has a tab for All plus one per worker (names from `WORKERS`). A worker's tab shows only jobs assigned to them, in visit order. The phone remembers the last tab picked. On a worker's tab, they can switch between List and Calendar. Calendar shows that worker's day (7 AM to 7 PM) like the office schedule; tap a visit to open the job. Finished visits show faded with a ✓.
 
 Tenants can message on open and reopened requests, not finished ones. Workers never see messages.
 Workers can open the app's Worker side to see a warning if any field is missing.
