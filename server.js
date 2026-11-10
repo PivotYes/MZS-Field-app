@@ -47,6 +47,7 @@ const codeOf = (map, label) => { const n = norm(label); for (const [k, v] of Obj
 
 /* ---------- Airtable ---------- */
 let schema = { choices: {}, missing: [], loaded: false, error: "" };
+let schemaAt = 0;
 
 async function at(method, urlPath, body, host) {
   const r = await fetch((host || "https://api.airtable.com") + urlPath, {
@@ -64,6 +65,7 @@ async function at(method, urlPath, body, host) {
 const tablePath = t => "/v0/" + BASE + "/" + encodeURIComponent(t);
 
 async function loadSchema() {
+  schemaAt = Date.now();
   try {
     const j = await at("GET", "/v0/meta/bases/" + BASE + "/tables");
     const choices = {}, missing = [];
@@ -300,7 +302,8 @@ async function api(req, res, url) {
 
   if (m === "GET" && p === "/api/health") {
     if (!officeOk(req)) needPin(req);
-    if (!schema.loaded) await loadSchema();
+    // Check Airtable again if something was missing, so a newly added field clears the warning (at most once a minute)
+    if (!schema.loaded || ((schema.missing.length || schema.error) && Date.now() - schemaAt > 60000)) await loadSchema();
     return send(res, 200, { ok: schema.loaded && !schema.missing.length, missing: schema.missing, error: schema.error });
   }
 
