@@ -114,6 +114,9 @@ input[type=time]{width:100%;font:inherit;color:var(--ink);background:var(--card)
 .band{position:absolute;left:0;right:0;opacity:0;background:var(--okSoft);pointer-events:none;transition:opacity .15s}
 .cal[data-hl="morning"] .band.morning,.cal[data-hl="afternoon"] .band.afternoon{opacity:.85}
 .blk{position:absolute;left:4px;right:4px;border-radius:8px;background:var(--blueSoft);border:1px solid var(--blue);border-left-width:4px;padding:2px 6px;font-size:13px;line-height:1.25;overflow:hidden;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;color:var(--ink)}
+button.blk{font:inherit;font-size:13px;text-align:left;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start}
+.blk.donev{opacity:.55}
+.cal.one{min-width:0;grid-template-columns:72px minmax(0,1fr)}
 .blk.urg{border-color:var(--urg);background:var(--urgSoft)}
 .blk b{display:block}
 .blk .warn{color:var(--urg);font-weight:700}
@@ -190,7 +193,7 @@ const T = {
     setTime:"Set time", tenantBest:"Tenant’s best time", assignTo:"Worker", startAt:"Start time", length:"Length", saveTime:"Save", takeOff:"Take off schedule", cancel:"Cancel",
     today:"Today", jobOne:"job",
     oNew:"New request", oNewSub:"Send a request for a tenant. It goes on the schedule as “Not scheduled yet.”", oSent:"Request sent. Ticket", arriveWin:"Tech arrives between", and:"and",
-    allW:"All", tenantName:"Tenant name", priority:"Priority", priHint:"How soon does this need fixing?",
+    allW:"All", tenantName:"Tenant name", listV:"List", calV:"Calendar", noTime:"Assigned, no time set", dayOff:"No visits this day.", priority:"Priority", priHint:"How soon does this need fixing?",
     p_urgent:"Urgent", p_high:"High", p_medium:"Medium", p_low:"Low", schedFor:"Scheduled", notSched:"Not scheduled yet", newReqBtn:"+ New request", oNewBar:"Taking a call? Send a request for a tenant.", noMine:"No open jobs for you.", pickMe:"Who are you?", unassigned:"Not assigned", prevDay:"Previous day", nextDay:"Next day", outside:"Outside tenant’s best time", jobsOn:"jobs", assigned:"Worker", needTime:"Pick a worker and a start time.",
     cat:{heat:"No heat / hot water",leak:"Leak / water",electric:"Electric / lights",appliance:"Appliance",door:"Door / lock / window",pests:"Pests",building:"Building / hallway",other:"Something else"}
   },
@@ -245,7 +248,7 @@ const T = {
     setTime:"Poner hora", tenantBest:"Mejor hora del inquilino", assignTo:"Técnico", startAt:"Hora de inicio", length:"Duración", saveTime:"Guardar", takeOff:"Quitar del horario", cancel:"Cancelar",
     today:"Hoy", jobOne:"trabajo",
     oNew:"Nueva solicitud", oNewSub:"Envíe una solicitud por un inquilino. Aparece en el horario como “Sin programar.”", oSent:"Solicitud enviada. Ticket", arriveWin:"El técnico llega entre", and:"y",
-    allW:"Todos", tenantName:"Nombre del inquilino", priority:"Prioridad", priHint:"¿Qué tan pronto se necesita arreglar?",
+    allW:"Todos", tenantName:"Nombre del inquilino", listV:"Lista", calV:"Calendario", noTime:"Asignado, sin hora", dayOff:"No hay visitas este día.", priority:"Prioridad", priHint:"¿Qué tan pronto se necesita arreglar?",
     p_urgent:"Urgente", p_high:"Alta", p_medium:"Media", p_low:"Baja", schedFor:"Programado", notSched:"Sin programar", newReqBtn:"+ Nueva solicitud", oNewBar:"¿Recibiendo una llamada? Envíe una solicitud por un inquilino.", noMine:"No tiene trabajos abiertos.", pickMe:"¿Quién es usted?", unassigned:"Sin asignar", prevDay:"Día anterior", nextDay:"Día siguiente", outside:"Fuera de la mejor hora del inquilino", jobsOn:"trabajos", assigned:"Técnico", needTime:"Elija un técnico y una hora.",
     cat:{heat:"Sin calefacción / agua caliente",leak:"Fuga / agua",electric:"Electricidad / luces",appliance:"Electrodoméstico",door:"Puerta / cerradura / ventana",pests:"Plagas",building:"Edificio / pasillo",other:"Otra cosa"}
   }
@@ -274,7 +277,7 @@ const S={
   chat:{}, chatOpen:{}, chatBusy:{}, chatErr:{},
   calDate:"", ed:null, oErr:"", oMsg:"",
   oDraft:{building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime",priority:"medium",priTouched:false},
-  wMe: store.get("mzs-wme")||"",
+  wMe: store.get("mzs-wme")||"", wView: store.get("mzs-wview")==="cal"?"cal":"list", wDate:"",
   jobs:[], loaded:false, jobId:null, workerTab:"open",
   draft:{building:saved.building||"",apt:saved.apt||"",phone:saved.phone||"",name:saved.name||"",category:"",details:"",timePref:"anytime",priority:"medium",priTouched:false},
   files:[], sending:false, formErr:"", lastTicket:"", fromWorker:false,
@@ -300,7 +303,7 @@ const ARRIVE_WIN=60;
 const fmtWindow=v=>{ if(!v||!v.date) return ""; if(!v.start) return fmtVisit(v); const d=new Date(v.date+"T12:00:00");
   return d.toLocaleDateString(loc(),{weekday:"short",month:"short",day:"numeric"})+" · "+t("arriveWin")+" "+fmtClock(v.start)+" "+t("and")+" "+fmtClock(toHm(Math.min(toMin(v.start)+ARRIVE_WIN,23*60+59))); };
 const toHm=n=>String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");
-S.calDate=today();
+S.calDate=today(); S.wDate=today();
 
 /* ---------- server calls ---------- */
 async function api(method,path,body){
@@ -755,12 +758,43 @@ function vJobs(){
     <button data-act="wme" data-v="" aria-pressed="${!me}">${t("allW")} (${cnt("")})</button>
     ${W.map(w=>`<button data-act="wme" data-v="${esc(w)}" aria-pressed="${me===w}">${esc(w)} (${cnt(w)})</button>`).join("")}
   </div>
-  <div class="seg" role="group" aria-label="Jobs">
+  ${me?`<div class="seg" role="group" aria-label="${t("calV")}" style="margin-bottom:8px">
+    <button data-act="wview" data-v="list" aria-pressed="${S.wView!=="cal"}">☰ ${t("listV")}</button>
+    <button data-act="wview" data-v="cal" aria-pressed="${S.wView==="cal"}">▦ ${t("calV")}</button>
+  </div>`:""}
+  ${me&&S.wView==="cal"?vWorkerCal(me,mine):`<div class="seg" role="group" aria-label="Jobs">
     <button data-act="wtab" data-v="open" aria-pressed="${S.workerTab==="open"}">${t("openTab")} (${open.length})</button>
     <button data-act="wtab" data-v="done" aria-pressed="${S.workerTab==="done"}">${t("doneTab")} (${done.length})</button>
   </div>
-  ${!S.loaded?`<p class="empty">${t("loading")}</p>`:!list.length?`<p class="empty">${S.workerTab==="open"?(me?t("noMine"):t("noJobs")):t("noDone")}</p>`:list.map(card).join("")}
+  ${!S.loaded?`<p class="empty">${t("loading")}</p>`:!list.length?`<p class="empty">${S.workerTab==="open"?(me?t("noMine"):t("noJobs")):t("noDone")}</p>`:list.map(card).join("")}`}
   <div style="margin-top:16px"><button class="btn block" data-act="flag">${t("flag")}</button></div>`;
+}
+// One worker's day: same grid as the office schedule, one lane, tap a visit to open the job
+function vWorkerCal(me,mine){
+  const day=mine.filter(j=>j.visit&&j.visit.date===S.wDate&&j.visit.start);
+  const noTime=mine.filter(j=>j.status!=="done"&&j.visit&&j.visit.date===S.wDate&&!j.visit.start);
+  const H=(CAL_END-CAL_START)*PXH, d=new Date(S.wDate+"T12:00:00");
+  const hours=[]; for(let h=CAL_START;h<CAL_END;h++) hours.push(`<span style="top:${(h-CAL_START)*PXH}px">${esc(fmtClock(toHm(h*60)))}</span>`);
+  const blk=j=>{
+    const s=Math.max(CAL_START*60,Math.min(CAL_END*60-SNAP,toMin(j.visit.start)));
+    const len=Math.min(j.mins||60,CAL_END*60-s), top=(s-CAL_START*60)*PXM, ht=Math.max(22,len*PXM-2);
+    return `<button class="blk ${j.urgent?"urg":""} ${j.status==="done"?"donev":""}" style="top:${top}px;height:${ht}px" data-act="openJob" data-id="${esc(j.id)}">
+      <b>${esc(fmtClock(j.visit.start))}–${esc(fmtClock(toHm(toMin(j.visit.start)+(j.mins||60))))} · ${esc(catName(j.category))}${j.status==="done"?" ✓":""}</b>
+      ${esc(t("apt"))} ${esc(j.apt)}${j.building?" · "+esc(j.building):""}</button>`;
+  };
+  return `<div class="calnav">
+    <span class="calday">${esc(d.toLocaleDateString(loc(),{weekday:"long",month:"long",day:"numeric"}))}</span>
+    <button class="btn sm" data-act="wDay" data-v="-1" aria-label="${t("prevDay")}">‹</button>
+    <button class="btn sm" data-act="wDay" data-v="0">${t("today")}</button>
+    <button class="btn sm" data-act="wDay" data-v="1" aria-label="${t("nextDay")}">›</button>
+    <input type="date" data-wcal="1" value="${esc(S.wDate)}" aria-label="${t("date")}">
+  </div>
+  ${noTime.length?`<div class="card"><p class="ttl" style="font-size:16px">${t("noTime")}</p>${noTime.map(j=>`<p class="meta">${esc(catName(j.category))} · ${t("apt")} ${esc(j.apt)} · <button class="link" style="padding:0;min-height:0" data-act="openJob" data-id="${esc(j.id)}">${t("openJob")}</button></p>`).join("")}</div>`:""}
+  ${!S.loaded?`<p class="empty">${t("loading")}</p>`:`<div class="calwrap" style="margin-top:12px"><div class="cal one">
+    <div></div><div class="lh">${esc(me)}<span class="small">${day.length?day.length+" "+(day.length===1?t("jobOne"):t("jobsOn")):t("dayOff")}</span></div>
+    <div class="tcol" style="height:${H}px">${hours.join("")}</div>
+    <div class="lane" style="height:${H}px">${day.map(blk).join("")}</div>
+  </div></div>`}`;
 }
 function vJob(){
   const j=S.jobs.find(x=>x.id===S.jobId);
@@ -969,6 +1003,8 @@ document.addEventListener("click",async ev=>{
   if(a==="chatSend"){ chatSend(id); return; }
   if(a==="signOut"){ S.authed=false; S.pin=""; S.jobs=[]; S.fb=[]; store.del("mzs-pin"); S.view="pin"; render(); return; }
   if(a==="wtab"){ S.workerTab=v; render(); return; }
+  if(a==="wview"){ S.wView=v; store.set("mzs-wview",v); render(); return; }
+  if(a==="wDay"){ S.wDate=v==="0"?today():addDays(S.wDate,Number(v)); render(); return; }
   if(a==="wme"){ S.wMe=v; if(v) store.set("mzs-wme",v); else store.del("mzs-wme"); render(); return; }
   if(a==="openJob"){ S.jobId=id; S.view="job"; render(); window.scrollTo(0,0); return; }
   if(a==="flag"){ S.fromWorker=true; S.draft={building:"",apt:"",phone:"",name:"",category:"",details:"",timePref:"anytime",priority:"medium",priTouched:false}; S.view="form"; S.formErr=""; render(); window.scrollTo(0,0); return; }
@@ -1010,6 +1046,7 @@ document.addEventListener("input",ev=>{
 document.addEventListener("change",async ev=>{
   const el=ev.target;
   if(el.dataset.fbsel){ S.fbDraft.screen=el.value; return; }
+  if(el.dataset.wcal){ if(el.value){ S.wDate=el.value; render(); } return; }
   if(el.dataset.cal){ if(el.value){ S.calDate=el.value; render(); } return; }
   if(el.dataset.ed&&S.ed){ S.ed[el.dataset.ed]=el.value; return; }
   if(el.dataset.sched){ const id=el.dataset.id; const j=S.jobs.find(x=>x.id===id)||{};
