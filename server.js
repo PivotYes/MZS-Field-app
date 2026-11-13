@@ -16,8 +16,9 @@ const crypto = require("crypto");
 const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.AIRTABLE_TOKEN || "";
 const BASE = process.env.AIRTABLE_BASE_ID || "";
-const PIN = process.env.WORKER_PIN || "";
-const OFFICE_PIN = process.env.OFFICE_PIN || "";
+// .trim(): a space or line break pasted into Render would otherwise make the right PIN fail
+const PIN = (process.env.WORKER_PIN || "").trim();
+const OFFICE_PIN = (process.env.OFFICE_PIN || "").trim();
 const AI_KEY = process.env.ANTHROPIC_API_KEY || "";
 const AI_MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
 const WORKERS = String(process.env.WORKERS || "Worker 1,Worker 2,Worker 3").split(",").map(s => s.trim()).filter(Boolean).slice(0, 8);
@@ -250,7 +251,7 @@ function readBody(req, limit) {
 }
 function codeOk(given, secret) {
   if (!secret) return false;
-  const a = crypto.createHash("sha256").update(String(given || "")).digest();
+  const a = crypto.createHash("sha256").update(String(given || "").trim()).digest();
   const b = crypto.createHash("sha256").update(secret).digest();
   return crypto.timingSafeEqual(a, b);
 }
