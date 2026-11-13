@@ -179,7 +179,7 @@ const T = {
     sc_general:"General / whole app", sc_tenantForm:"Tenant: Report a problem", sc_tenantMine:"Tenant: My requests", sc_workerJobs:"Worker: Job list", sc_workerJob:"Worker: A job", sc_airtable:"Airtable fields",
     k_bug:"Something’s broken", k_change:"Change this", k_idea:"New idea", k_missing:"Something’s missing",
     atTitle:"Fields that will go to Airtable", atSub:"Each request becomes one Airtable record with these fields. Anything to add, rename, or drop? Send it as feedback under “Airtable fields.”",
-    pinTitle:"Worker sign-in", pinSub:"Enter the worker PIN to see jobs.", pin:"PIN", pinBtn:"Open jobs", pinWrong:"That PIN didn’t work. Try again.", signOut:"Sign out",
+    pinTitle:"Worker sign-in", pinSub:"Enter the worker PIN to see jobs.", pin:"PIN", pinBtn:"Open jobs", pinWrong:"That PIN didn’t work. Try again.", pinServer:"The PIN may be fine, but the app couldn’t load. Tell the office:", atError:"Can’t read the Airtable setup. Airtable says:", signOut:"Sign out",
     lookupSub:"Enter the phone and apartment you used when you sent the request.", showMine:"Show my requests",
     tooBig:"A file was too big (5 MB max). Try a photo or a shorter video.", netErr:"Couldn’t reach the server. Check your connection and try again.",
     fbPinNote:"Workers can see all feedback after signing in with the PIN.", missingFields:"Airtable setup issue. Missing:",
@@ -234,7 +234,7 @@ const T = {
     aiErr:"No se pudo escribir el reporte ahora. Puede escribirlo usted.",
     uploadErr:"Algunas fotos no se subieron.",
     flaggedBy:"Reportado por técnico",
-    pinTitle:"Acceso de técnico", pinSub:"Ingrese el PIN para ver los trabajos.", pin:"PIN", pinBtn:"Ver trabajos", pinWrong:"PIN incorrecto. Intente otra vez.", signOut:"Salir",
+    pinTitle:"Acceso de técnico", pinSub:"Ingrese el PIN para ver los trabajos.", pin:"PIN", pinBtn:"Ver trabajos", pinWrong:"PIN incorrecto. Intente otra vez.", pinServer:"El PIN puede estar bien, pero la app no pudo cargar. Avise a la oficina:", atError:"No se puede leer Airtable. Airtable dice:", signOut:"Salir",
     lookupSub:"Ingrese el teléfono y el apartamento que usó al enviar la solicitud.", showMine:"Ver mis solicitudes",
     tooBig:"Un archivo es muy grande (máx. 5 MB). Pruebe una foto o un video más corto.", netErr:"No se pudo conectar. Revise su conexión e intente otra vez.",
     fbPinNote:"Los técnicos ven todos los comentarios después de entrar con el PIN.",
@@ -323,7 +323,7 @@ async function api(method,path,body){
 }
 async function loadJobs(){
   try{ S.jobs=await api("GET","/api/jobs"); S.loaded=true; S.authed=true; soft(); return true; }
-  catch(e){ S.loaded=true; soft(); return false; }
+  catch(e){ S.loaded=true; soft(); return e; }
 }
 async function loadMine(){
   if(!S.lookup.phone||!S.lookup.apt) return;
@@ -334,7 +334,7 @@ async function loadMine(){
 }
 async function loadOffice(){
   try{ S.office=await api("GET","/api/office"); S.oLoaded=true; S.oauthed=true; soft(); return true; }
-  catch(e){ S.oLoaded=true; soft(); return false; }
+  catch(e){ S.oLoaded=true; soft(); return e; }
 }
 async function loadFb(){ if(!S.authed) return; try{ S.fb=await api("GET","/api/feedback"); soft(); }catch(e){} }
 function putJob(j){ const i=S.jobs.findIndex(x=>x.id===j.id); if(i>=0) S.jobs[i]=j; else S.jobs.push(j); }
@@ -390,6 +390,7 @@ function banners(){
   let h=S.view==="feedback"?"":`<div class="testbar"><span><b>${t("testing")}</b> ${t("testingSub")}</span><button class="btn sm primary" data-act="toFb">${t("giveFb")}</button></div>`;
   if(S.role==="office"&&S.oauthed&&(S.view==="office"||S.view==="officeReq")) h+=`<div class="testbar" style="background:var(--okSoft)"><span>${t("oNewBar")}</span><button class="btn sm ok" data-act="oNewReq" ${S.view==="office"&&S.oTab==="new"?"disabled":""}>${t("newReqBtn")}</button></div>`;
   if((S.authed||S.oauthed)&&S.health&&S.health.missing&&S.health.missing.length) h+=`<div class="alert">${t("missingFields")} ${esc(S.health.missing.join(", "))}</div>`;
+  if((S.authed||S.oauthed)&&S.health&&S.health.error) h+=`<div class="alert">${t("atError")} ${esc(S.health.error)}</div>`;
   return h;
 }
 function render(){
@@ -937,12 +938,14 @@ async function writeUp(id){
     if(await upd(id,{notes,writeup:r.text})){ delete S.notes[id]; delete S.writeups[id]; }
   }catch(e){ delete S.busy[id+"ai"]; S.err[id]=t("aiErr"); render(); }
 }
+// Only a 401 means the PIN is wrong. Anything else is a server or Airtable problem: say so.
+function pinError(e){ return e&&e.status===401?t("pinWrong"):t("pinServer")+" "+((e&&e.message)||""); }
 async function tryPin(pin){
   S.pin=pin; S.pinBusy=true; S.pinErr=""; render();
   const ok=await loadJobs();
   S.pinBusy=false;
-  if(ok){ S.authed=true; store.set("mzs-pin",pin); S.view="jobs"; try{S.health=await api("GET","/api/health")}catch(e){} }
-  else { S.pin=""; S.pinErr=t("pinWrong"); }
+  if(ok===true){ S.authed=true; store.set("mzs-pin",pin); S.view="jobs"; try{S.health=await api("GET","/api/health")}catch(e){} }
+  else { S.pin=""; S.pinErr=pinError(ok); }
   render();
 }
 
@@ -950,8 +953,8 @@ async function tryOfficePin(pin){
   S.opin=pin; S.pinBusy=true; S.pinErr=""; render();
   const ok=await loadOffice();
   S.pinBusy=false;
-  if(ok){ S.oauthed=true; store.set("mzs-opin",pin); S.view="office"; try{S.health=await api("GET","/api/health")}catch(e){} }
-  else { S.opin=""; S.pinErr=t("pinWrong"); }
+  if(ok===true){ S.oauthed=true; store.set("mzs-opin",pin); S.view="office"; try{S.health=await api("GET","/api/health")}catch(e){} }
+  else { S.opin=""; S.pinErr=pinError(ok); }
   render();
 }
 async function chatSend(id){
@@ -1067,8 +1070,8 @@ document.addEventListener("change",async ev=>{
 render();
 (async()=>{
   try{ S.cfg=await api("GET","/api/config"); }catch(e){}
-  if(S.pin){ const ok=await loadJobs(); if(ok){ S.authed=true; try{S.health=await api("GET","/api/health")}catch(e){} } else { S.pin=""; store.del("mzs-pin"); } }
-  if(S.opin){ const ok=await loadOffice(); if(ok){ S.oauthed=true; if(!S.health) try{S.health=await api("GET","/api/health")}catch(e){} } else { S.opin=""; store.del("mzs-opin"); } }
+  if(S.pin){ const ok=await loadJobs(); if(ok===true){ S.authed=true; try{S.health=await api("GET","/api/health")}catch(e){} } else { if(ok.status===401) store.del("mzs-pin"); else S.pinErr=pinError(ok); S.pin=""; } }
+  if(S.opin){ const ok=await loadOffice(); if(ok===true){ S.oauthed=true; if(!S.health) try{S.health=await api("GET","/api/health")}catch(e){} } else { if(ok.status===401) store.del("mzs-opin"); else S.pinErr=pinError(ok); S.opin=""; } }
   if(S.role==="worker") S.view=S.authed?"jobs":"pin";
   if(S.role==="office") S.view=S.oauthed?"office":"opin";
   render();
